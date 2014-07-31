@@ -25,7 +25,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #define LIBRARY_CODE
-#include "../channel-switch/channel-switch.c"
+#include "channel-switch.c"
 
 #ifndef MIN
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -351,7 +351,6 @@ static void selection_move(int dir) {
 	selection += dir;
 }
 
-// blip range: every 200 ms for 100%, every 4000ms for 0%.
 static volatile unsigned bms;
 static void set_bms(float percent) {
 	float max = 800, min=50;
