@@ -12,6 +12,7 @@ MacGeiger - a WIFI AP locator utility
   - depends on either SDL or ncurses devel package installed
 
 how to build:
+-------------
 paste this into your shell
 
     mkdir /tmp/macgeiger-build
@@ -26,10 +27,13 @@ if you want to use the ncurses backend (which is much harder to debug using gdb)
 replace SDL_CONSOLE with NCURSES_CONSOLE in the above printf command
 
 rebuilding with a different console backend:
+-------------------------------------------
 if you decided to try another backend (not the previously used one), run
-    PATH="$PATH:../rcb" RCBFLAGS=--new" make
+
+    PATH="$PATH:../rcb" RCBFLAGS=--new make
 
 how to use:
+-----------
 
     ./macgeiger.out wlan0mon
 
