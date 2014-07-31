@@ -1,0 +1,9 @@
+*.out
+*.rcb
+*.o
+*.lo
+*.a
+*.so
+*.pcap
+*.pcapng
+config.mak
