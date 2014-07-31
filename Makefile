@@ -14,7 +14,7 @@ all:
 
 clean:
 	rm -f *.o
-	rm -f $(PROGS)
+	rm -f $(FNAME).out
 	rm -f *.rcb
 
 .PHONY: all clean optimized debug
