@@ -23,9 +23,15 @@ paste this into your shell
     PATH="$PATH:../rcb" make
 
 if you want to use the ncurses backend (which is much harder to debug using gdb),
-replace SDL_CONSOLE with NCURSES console in the above printf command
+replace SDL_CONSOLE with NCURSES_CONSOLE in the above printf command
+
+rebuilding with a different console backend:
+if you decided to try another backend (not the previously used one), run
+    PATH="$PATH:../rcb" RCBFLAGS=--new" make
 
 how to use:
-./macgeiger wlan0mon
+
+    ./macgeiger.out wlan0mon
+
 let the program gather network info for some seconds, then select an AP from the list
 with cursor-up, cursor-down, then hit ENTER to track it with audio feedback.
