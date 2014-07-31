@@ -214,9 +214,51 @@ static unsigned const char* find_tag(unsigned const char *tagdata, unsigned tag,
 	return 0;
 }
 
+static long long timeval2utime(struct timeval*t) {
+	return (t->tv_sec * 1000LL * 1000LL) + t->tv_usec;
+}
+
+static long long getutime64(void) {
+	struct timeval t;
+	gettimeofday(&t, NULL);
+	return timeval2utime(&t);
+}
+
+
+static int filebased;
+
+static const unsigned char* pcap_next_wrapper(pcap_t *foo, struct pcap_pkthdr *h_out) {
+	if(!filebased) return pcap_next(foo, h_out);
+	static long long pcap_file_start_time, start_time;
+	static unsigned char buf[2][2048];
+	static struct pcap_pkthdr h[2];
+	static int actbuf;
+	const unsigned char* ret;
+	if(start_time == 0 || getutime64() - start_time >= timeval2utime(&h[!actbuf].ts) - pcap_file_start_time) {
+		ret = pcap_next(foo, h_out);
+		if(ret) {
+			h[actbuf] = *h_out;
+			assert(h[actbuf].len <= sizeof buf[actbuf]);
+			memcpy(buf[actbuf], ret, h[actbuf].len);
+			actbuf = !actbuf;
+		}
+		if(!start_time) {
+			start_time = getutime64();
+			assert(ret);
+			pcap_file_start_time = timeval2utime(&h_out->ts);
+			return 0;
+		}
+		if(ret) {
+			*h_out = h[actbuf];
+			return buf[actbuf];
+		} else return 0;
+	} else
+		return 0;
+}
+
 static int process_frame(pcap_t *foo) {
 	struct pcap_pkthdr h;
-	const unsigned char* data = pcap_next(foo, &h);
+	const unsigned char* data = pcap_next_wrapper(foo, &h);
 	if(data) {
 		struct ieee80211_radiotap_header *rh = (void*) data;
 		//size_t next_chunk = sizeof(*rh);
@@ -306,12 +348,6 @@ static int next_chan(int chan) {
 			assert(0);
 			return 0;
 	}
-}
-
-static long long getutime64(void) {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	return (t.tv_sec * 1000LL * 1000LL) + t.tv_usec;
 }
 
 static Console co, *t = &co;
@@ -468,7 +504,7 @@ static int blip_frame(int idx) {
 static void generate_blip(unsigned char* data, size_t bufsize, double volume) {
         int i;
         for(i=0;i<bufsize;i++)
-#if 1
+#if 0
 		data[i] = (blip_frame(i)-128)*volume+127;
 #else
 		data[i] = blip_frame(i)*volume;
@@ -501,6 +537,7 @@ static void* chanwalker_thread(void* arg) {
 	char* itf = arg;
 	int channel = 1, delay = 800;
 	long long t = 0;
+	if(filebased) return 0;
 	while(!selected) {
 		if((getutime64() - t)/1000 >= delay) {
 			set_channel(itf, channel = next_chan(channel));
@@ -516,10 +553,18 @@ int main(int argc,char**argv) {
 	min = 127;
 	max = -127;
 	char errbuf[PCAP_ERRBUF_SIZE];
-	pcap_t *foo = pcap_create(argv[1], errbuf);
+	pcap_t *foo;
+	if(strchr(argv[1], '.') && access(argv[1], R_OK) == 0) {
+		filebased = 1;
+		foo = pcap_open_offline(argv[1], errbuf);
+	} else {
+		foo = pcap_create(argv[1], errbuf);
+	}
 	if(!foo) { dprintf(2, "%s\n", errbuf); return 1; }
 
 	int ret;
+
+	if(filebased) goto skip;
 
 	if((ret = pcap_can_set_rfmon(foo)) == 1) {
 		ret = pcap_set_rfmon(foo, 1);
@@ -537,32 +582,25 @@ int main(int argc,char**argv) {
 		return 1;
 	}
 
+	skip:;
+
 	initconcol();
 
 	signal(SIGINT, sigh);
 
-	unsigned ms_passed = 1000;
 	int channel = 1;
-	long long now = 0;
+	long long tm = 0;
 	pthread_t bt, wt;
 	pthread_create(&wt, 0, chanwalker_thread, argv[1]);
 
 	while(!stop) {
-		if(ms_passed > 20) { /* 50 FPS */
-			if(!selected) {
-				//set_channel(argv[1], channel = next_chan(channel));
-				//ms_passed = (getutime64()-now)/1000;
-				//dprintf(2, "set_channel took %u ms\n", ms_passed);
-			}
-			ms_passed = 0;
-			now = getutime64();
-			dump();
-		}
 		int ret = process_frame(foo);
 		long long tmp = getutime64();
-		ms_passed += (tmp-now)/1000;
-		now = tmp;
-		if(ret >= 0) wlans[ret].last_seen = now;
+		if(ret >= 0) wlans[ret].last_seen = tmp;
+		if((tmp-tm) >= 20*1000) {
+			tm = tmp;
+			dump();
+		}
 		int k = console_getkey_nb(t);
 		switch(k) {
 			case CK_CURSOR_DOWN: selection_move(1);break;
@@ -573,7 +611,7 @@ int main(int argc,char**argv) {
 					pthread_join(wt, 0);
 					draw_bg();
 					pthread_create(&bt, 0, blip_thread, 0);
-					set_channel(argv[1], wlans[selection].channel);
+					if(!filebased) set_channel(argv[1], wlans[selection].channel);
 				} else {
 					pthread_create(&wt, 0, chanwalker_thread, argv[1]);
 					pthread_join(bt, 0);
