@@ -37,6 +37,7 @@
 
 //RcB: LINK "-lpcap"
 //RcB: LINK "-lao"
+//RcB: LINK "-lpthread"
 #include <ao/ao.h>
 
 #include "../concol/console.h"
