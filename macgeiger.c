@@ -419,7 +419,6 @@ static void dump(void) {
 }
 
 static void initconcol() {
-	Console* t = &co;
 	console_init(t);
 	point reso = {800, 600};
 //	point reso = {1280, 600};
