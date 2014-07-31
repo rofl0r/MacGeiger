@@ -480,16 +480,18 @@ static void generate_blip(unsigned char* data, size_t bufsize, double volume) {
 static void* blip_thread(void* arg) {
 	struct AoWriter ao;
 	AoWriter_init(&ao);
-	unsigned char buf[100];
+	unsigned char buf[100], silence[1000];
 	generate_blip(buf, sizeof(buf), DEFAULT_VOLUME);
+	memset(silence, buf[99], sizeof silence);
+	long long t = getutime64();
 	unsigned passed = 0;
 	while(selected) {
-		usleep(1000);
-		passed++;
-		if(passed >= bms) {
-			passed=0;
+		if((getutime64() - t)/1000 >= bms) {
 			AoWriter_write(&ao, buf, sizeof buf);
+			t = getutime64();
 		}
+		AoWriter_write(&ao, silence, sizeof silence);
+		usleep(1);
 	}
 	AoWriter_close(&ao);
 	return 0;
