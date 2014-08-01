@@ -397,20 +397,14 @@ static void set_bms(float percent) {
 
 static void dump_wlan(unsigned idx) {
 	struct wlaninfo *w = &wlans[idx];
-	if(idx * 3 + 1 > dim.h || (selected && selection != idx)) return;
+	if(idx * 2 + 1 > dim.h || (selected && selection != idx)) return;
 	long long now = getutime64();
 	long long age_ms = (now - w->last_seen)/1000;
 	age_ms=MIN(5000, age_ms)/100;
-	console_goto(t, 1, idx*3);
+
+	console_goto(t, 0, idx*2);
 	console_setcolor(t, 0, BGCOL);
 
-	unsigned a = get_a(age_ms);
-	console_setcolor(t, 1, RGB(a,a,a));
-	console_printf(t, "%.2d %02x:%02x:%02x:%02x:%02x:%02x %-24s %.2f %d",
-	                  w->channel, w->mac[0], w->mac[1],  w->mac[2], w->mac[3], w->mac[4], w->mac[5], w->essid,
-	                  (double)w->total_rssi/(double)w->count, w->last_rssi);
-
-	console_goto(t, 0, idx*3+1);
 	console_setcolor(t, 1, RGB(255,255,0));
 	if(idx == selection) {
 		console_printchar(t, '>', 0);
@@ -418,9 +412,14 @@ static void dump_wlan(unsigned idx) {
 		console_printchar(t, ' ', 0);
 	}
 
-	console_goto(t, 1, idx*3+1);
+	unsigned a = get_a(age_ms);
+	console_setcolor(t, 1, RGB(a,a,a));
+	console_printf(t, "%*s", 16, w->essid);
+
+
+	console_goto(t, 18, idx*2);
 	int scale = max - min;
-	int width = dim.w - 2;
+	int width = dim.w - 19;
 	unsigned x;
 	float widthpercent = (float)width/100.f;
 	float scalepercent = (float)scale/100.f;
