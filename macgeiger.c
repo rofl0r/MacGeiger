@@ -63,28 +63,28 @@ static struct wlaninfo {
 	unsigned long count;
 	int last_rssi;
 } wlans[32];
+static unsigned wlan_count;
 
 static signed char min, max;
 static unsigned char selection, selected;
 
 static int get_wlan_by_essid(char* essid) {
 	unsigned i;
-	for(i=0;i<sizeof(wlans)/sizeof(wlans[0]);i++)
+	for(i=0;i<wlan_count;i++)
 		if(!strcmp(essid, wlans[i].essid)) return i;
 	return -1;
 }
 
 static int get_wlan_by_mac(unsigned char mac[6]) {
 	unsigned i;
-	for(i=0;i<sizeof(wlans)/sizeof(wlans[0]);i++)
+	for(i=0;i<wlan_count;i++)
 		if(!memcmp(mac, wlans[i].mac, 6)) return i;
 	return -1;
 }
 
 static int get_new_wlan(void) {
-	unsigned i;
-	for(i=0;i<sizeof(wlans)/sizeof(wlans[0]);i++)
-		if(!wlans[i].essid[0] && !memcmp(wlans[i].mac, "\0\0\0\0\0\0", 6)) return i;
+	if(wlan_count+1<sizeof(wlans)/sizeof(wlans[0]))
+		return wlan_count++;
 	return -1;
 }
 
@@ -109,7 +109,6 @@ int stop;
 void sigh(int x) {
 	stop = 1;
 }
-
 
 struct ieee80211_radiotap_header {
 	uint8_t it_version;
@@ -450,7 +449,7 @@ static void dump(void) {
 	unsigned i;
 	//dprintf(1, "********************\n");
 	//draw_bg();
-	for(i=0;i<sizeof(wlans)/sizeof(wlans[0])&&(wlans[i].essid[0]||memcmp(wlans[i].mac, "\0\0\0\0\0\0", 6));i++)
+	for(i=0;i<wlan_count;i++)
 		dump_wlan(i);
 	console_refresh(t);
 }
