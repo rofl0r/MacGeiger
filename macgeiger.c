@@ -545,6 +545,34 @@ static void* chanwalker_thread(void* arg) {
 	}
 	return 0;
 }
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+/* set an interface up or down, depending on whether up is set.
+   if checkonly is true, no change will be made and the result
+   of the function can be interpreted as "isdownup".
+   if the interface was already up/down, 2 is returned.
+   if the interface was successfully upped/downed, 1 is returned.
+   0 is only returned if checkonly is set and the interface was not
+   in the queried state.
+   -1 is returned on error. */
+static int ifdownup(const char *dev, int up, int checkonly) {
+	int fd, ret = -1;
+	if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) return -1;
+	struct ifreq ifr = {0};
+	strcpy(ifr.ifr_name, dev);
+	if(ioctl(fd, SIOCGIFFLAGS, &ifr) <0) goto done;
+	int isup = ifr.ifr_flags & IFF_UP;
+	if((up && isup) || (!up && !isup)) ret = 2;
+	else if (checkonly) ret = 0;
+	else {
+		if(up) ifr.ifr_flags |= IFF_UP;
+		else   ifr.ifr_flags &= ~(IFF_UP);
+		ret = (ioctl(fd, SIOCSIFFLAGS, &ifr) >= 0);
+	}
+	done:
+	close(fd);
+	return ret;
+}
 
 int main(int argc,char**argv) {
 	if(argc == 1) return usage();
@@ -560,10 +588,11 @@ int main(int argc,char**argv) {
 	}
 	if(!foo) { dprintf(2, "%s\n", errbuf); return 1; }
 
-	int ret;
+	int ret, wasdown;
 
 	if(filebased) goto skip;
-
+	ret = ifdownup(argv[1], 0, 0);
+	wasdown = (ret == 2);
 	if((ret = pcap_can_set_rfmon(foo)) == 1) {
 		ret = pcap_set_rfmon(foo, 1);
 		if(ret != 0) {
@@ -571,12 +600,13 @@ int main(int argc,char**argv) {
 			return 1;
 		}
 	} else {
-		dprintf(2, "warning: cannot set rfmon %d\n", ret);
+		dprintf(2, "ERROR: cannot set rfmon %d.\n", ret);
+		if(getuid()) dprintf(2, "you probably need root privs.\n");
 		return 1;
 	}
-
+	ifdownup(argv[1], 1, 0);
 	if(pcap_activate(foo)) {
-		dprintf(2, "%s\n", pcap_geterr(foo));
+		dprintf(2, "pcap_activate failed: %s\n", pcap_geterr(foo));
 		return 1;
 	}
 
@@ -625,6 +655,11 @@ int main(int argc,char**argv) {
 		selected = 1;
 		pthread_join(wt, 0);
 	}
+	if(!filebased) {
+		if(!wasdown) pcap_set_rfmon(foo, 0);
+		else ifdownup(argv[1], 0, 0);
+	}
+
 	pcap_close(foo);
 	console_cleanup(t);
 	return 0;
