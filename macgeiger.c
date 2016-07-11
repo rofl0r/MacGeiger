@@ -574,6 +574,26 @@ static int ifdownup(const char *dev, int up, int checkonly) {
 	return ret;
 }
 
+#include "wireless-lite.h"
+static int getiwmode(const char *dev) {
+	int fd, ret = -1;
+	if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) return -1;
+	struct iwreq iwr = {0};
+	strcpy(iwr.ifr_name, dev);
+	if(ioctl(fd, SIOCGIWMODE, &iwr) >=0) ret = iwr.u.mode;
+	close(fd);
+	return ret;
+}
+
+static int setiwmode(const char *dev, int mode) {
+	int fd, ret = -1;
+	if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) return -1;
+	struct iwreq iwr = {.u.mode = mode};
+	strcpy(iwr.ifr_name, dev);
+	ret = ioctl(fd, SIOCSIWMODE, &iwr);
+	close(fd);
+	return ret;
+}
 int main(int argc,char**argv) {
 	if(argc == 1) return usage();
 	min = 127;
@@ -588,23 +608,22 @@ int main(int argc,char**argv) {
 	}
 	if(!foo) { dprintf(2, "%s\n", errbuf); return 1; }
 
-	int ret, wasdown;
+	int ret, wasdown, orgmode;
 
 	if(filebased) goto skip;
-	ret = ifdownup(argv[1], 0, 0);
-	wasdown = (ret == 2);
-	if((ret = pcap_can_set_rfmon(foo)) == 1) {
-		ret = pcap_set_rfmon(foo, 1);
-		if(ret != 0) {
-			dprintf(2, "pcap_set_rfmon failed\n");
-			return 1;
+
+	if((orgmode = getiwmode(argv[1])) != IW_MODE_MONITOR) {
+		if((ret = ifdownup(argv[1], 0, 0)) == -1) {
+			iferr:;
+			perror("error setting up interface - maybe need to run as root.");
 		}
+		wasdown = (ret == 2);
+		if(setiwmode(argv[1], IW_MODE_MONITOR) == -1) goto iferr;
 	} else {
-		dprintf(2, "ERROR: cannot set rfmon %d.\n", ret);
-		if(getuid()) dprintf(2, "you probably need root privs.\n");
-		return 1;
+		wasdown = (ifdownup(argv[1], 0, 1) == 2);
 	}
-	ifdownup(argv[1], 1, 0);
+	if(ifdownup(argv[1], 1, 0) == -1) goto iferr;
+
 	if(pcap_activate(foo)) {
 		dprintf(2, "pcap_activate failed: %s\n", pcap_geterr(foo));
 		return 1;
@@ -656,8 +675,9 @@ int main(int argc,char**argv) {
 		pthread_join(wt, 0);
 	}
 	if(!filebased) {
-		if(!wasdown) pcap_set_rfmon(foo, 0);
-		else ifdownup(argv[1], 0, 0);
+		if(wasdown || orgmode != IW_MODE_MONITOR) ifdownup(argv[1], 0, 0);
+		if(orgmode != IW_MODE_MONITOR) setiwmode(argv[1], orgmode);
+		if(!wasdown && orgmode != IW_MODE_MONITOR) ifdownup(argv[1], 1, 0);
 	}
 
 	pcap_close(foo);
