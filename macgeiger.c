@@ -396,6 +396,9 @@ static void set_bms(float percent) {
 	bms = min + (100 - percent) * rpercent;
 }
 
+#define ESSID_PRINT_START 1
+#define ESSID_PRINT_END 24
+#define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
 static void dump_wlan(unsigned idx) {
 	struct wlaninfo *w = &wlans[idx];
 	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
@@ -415,12 +418,13 @@ static void dump_wlan(unsigned idx) {
 
 	unsigned a = get_a(age_ms);
 	console_setcolor(t, 1, RGB(a,a,a));
-	console_printf(t, "%*s", 16, w->essid);
+	console_goto(t, ESSID_PRINT_START, idx*LINES_PER_NET);
+	console_printf(t, "%*s", ESSID_PRINT_LEN, w->essid);
 
 
-	console_goto(t, 18, idx*LINES_PER_NET);
+	console_goto(t, ESSID_PRINT_END +1, idx*LINES_PER_NET);
 	int scale = max - min;
-	int width = dim.w - 19;
+	int width = dim.w - (ESSID_PRINT_LEN+2);
 	unsigned x;
 	float widthpercent = (float)width/100.f;
 	float scalepercent = (float)scale/100.f;
