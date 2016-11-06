@@ -504,7 +504,7 @@ static unsigned char blip[] = {0x52, 0x51, 0x51, 0x51, 0xC4, 0x4C, 0xF4, 0xF4, 0
 static int blip_frame(int idx) {
 	idx = idx % (2*sizeof(blip));
 	if(idx>=sizeof(blip)) idx=(2*sizeof(blip))-idx;
-	return blip[idx];
+	return(int) ((float) blip[idx] * 1.8f);
 }
 
 static void generate_blip(unsigned char* data, size_t bufsize, double volume) {
