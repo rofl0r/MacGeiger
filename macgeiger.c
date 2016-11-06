@@ -271,7 +271,7 @@ static int process_frame(pcap_t *foo) {
 			unsigned dbmoff = get_dbm_off(flags);
 			temp.last_rssi = ((signed char*)data)[sizeof(*rh) + dbmoff];
 			min = MIN(min, temp.last_rssi);
-			max = MAX(max, temp.last_rssi);
+			if(temp.last_rssi > max) max++;
 		}
 		{
 			assert(flags & (1U << IEEE80211_RADIOTAP_CHANNEL));
