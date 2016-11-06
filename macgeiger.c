@@ -615,6 +615,7 @@ int main(int argc,char**argv) {
 					pthread_join(bt, 0);
 				}
 				break;
+			case CK_QUIT:
 			case CK_ESCAPE: stop = 1; break;
 		}
 	}
