@@ -437,7 +437,9 @@ static void dump_wlan(unsigned idx) {
 	int avg_marker = (avg - (float)min) * scaleup;
 	int curr_marker = ((float)w->last_rssi - (float)min) * scaleup;
 	for(x = 0; x < width; x++) {
-		rgb_t step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
+		rgb_t step_color;
+		if(idx == selection) step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
+		else step_color = RGB(get_r(x/widthpercent),get_r(x/widthpercent),get_r(x/widthpercent));
 		console_setcolor(t, 0, step_color);
 		if(x != curr_marker) console_setcolor(t, 1, RGB(0,0,0));
 		else console_setcolor(t, 1, RGB(255,255,255));
