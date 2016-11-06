@@ -404,7 +404,7 @@ static void dump_wlan(unsigned idx) {
 	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
 	long long now = getutime64();
 	long long age_ms = (now - w->last_seen)/1000;
-	age_ms=MIN(5000, age_ms)/100;
+	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
 
 	console_goto(t, 0, idx*LINES_PER_NET);
 	console_setcolor(t, 0, BGCOL);
@@ -432,7 +432,8 @@ static void dump_wlan(unsigned idx) {
 	double avg = (double)w->total_rssi/(double)w->count;
 	float avg_percent = (avg - (float)min) / scalepercent;
 	float curr_percent = ((float)w->last_rssi - (float)min) / scalepercent;
-	set_bms(curr_percent);
+	if(age_ms == 0) set_bms(curr_percent);
+	else bms = 0;
 	int avg_marker = (avg - (float)min) * scaleup;
 	int curr_marker = ((float)w->last_rssi - (float)min) * scaleup;
 	for(x = 0; x < width; x++) {
@@ -525,7 +526,7 @@ static void* blip_thread(void* arg) {
 	long long t = getutime64();
 	unsigned passed = 0;
 	while(selected) {
-		if((getutime64() - t)/1000 >= bms) {
+		if(bms && (getutime64() - t)/1000 >= bms) {
 			AoWriter_write(&ao, buf, sizeof buf);
 			t = getutime64();
 		}
