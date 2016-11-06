@@ -381,9 +381,10 @@ static int get_g(unsigned percent) {
 static int get_a(unsigned age) {
 	return 5+((50 - age)*5);
 }
+#define LINES_PER_NET 1
 static void selection_move(int dir) {
 	if((int)selection+dir < 0) dir=0;
-	if(((int)selection+dir)*3+1 > dim.h) dir=0;
+	if(((int)selection+dir)*LINES_PER_NET+1 > dim.h) dir=0;
 	selection += dir;
 }
 
@@ -397,12 +398,12 @@ static void set_bms(float percent) {
 
 static void dump_wlan(unsigned idx) {
 	struct wlaninfo *w = &wlans[idx];
-	if(idx * 2 + 1 > dim.h || (selected && selection != idx)) return;
+	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
 	long long now = getutime64();
 	long long age_ms = (now - w->last_seen)/1000;
 	age_ms=MIN(5000, age_ms)/100;
 
-	console_goto(t, 0, idx*2);
+	console_goto(t, 0, idx*LINES_PER_NET);
 	console_setcolor(t, 0, BGCOL);
 
 	console_setcolor(t, 1, RGB(255,255,0));
@@ -417,7 +418,7 @@ static void dump_wlan(unsigned idx) {
 	console_printf(t, "%*s", 16, w->essid);
 
 
-	console_goto(t, 18, idx*2);
+	console_goto(t, 18, idx*LINES_PER_NET);
 	int scale = max - min;
 	int width = dim.w - 19;
 	unsigned x;
