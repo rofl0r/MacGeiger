@@ -441,7 +441,7 @@ static void set_bms(float percent) {
 }
 
 #define ESSID_PRINT_START 1
-#define ESSID_PRINT_END 24
+#define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
 static void dump_wlan(unsigned idx) {
 	struct wlaninfo *w = &wlans[idx];
