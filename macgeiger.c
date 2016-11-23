@@ -90,7 +90,7 @@ static int get_new_wlan(void) {
 
 static int set_rssi(struct wlaninfo *w) {
 	int i = -1;
-	if(w->essid[0]) i = get_wlan_by_essid(w->essid);
+//	if(w->essid[0]) i = get_wlan_by_essid(w->essid);
 	if(i == -1) i = get_wlan_by_mac(w->mac);
 	if(i == -1) i = get_new_wlan();
 	if(i != -1) {
