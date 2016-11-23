@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <ctype.h>
 #define LIBRARY_CODE
 #include "channel-switch.c"
 
@@ -67,6 +68,7 @@ static unsigned wlan_count;
 
 static signed char min, max;
 static unsigned char selection, selected;
+static Console co, *t = &co;
 
 static int get_wlan_by_essid(char* essid) {
 	unsigned i;
@@ -255,10 +257,53 @@ static const unsigned char* pcap_next_wrapper(pcap_t *foo, struct pcap_pkthdr *h
 		return 0;
 }
 
+static inline int myisascii(int x) {
+	return x >= ' ' && x < 127;
+}
+
+static void dump_packet(unsigned char* data, size_t len) {
+	static const char atab[] = "0123456789abcdef";
+	char hex[24*2+1], ascii[24+1];
+	unsigned h = 0, a = 0;
+	int fill = ' ';
+
+	while(len) {
+		len--;
+		hex[h++] = atab[*data >> 4];
+		hex[h++] = atab[*data & 0xf];
+		ascii[a++] = myisascii(*data) ? *data : '.';
+		if(a == 24) {
+	dump:
+			hex[h] = 0;
+			ascii[a] = 0;
+			printf("%s\t%s\n", hex, ascii);
+
+			if(fill == '_') return; /* jump from filler */
+
+			a = 0;
+			h = 0;
+		}
+		data++;
+	}
+	if(a) {
+	filler:
+		while(a<24) {
+			hex[h++] = fill;
+			hex[h++] = fill;
+			ascii[a++] = fill;
+		}
+		goto dump;
+	}
+	a = 0;
+	fill = '_';
+	goto filler;
+}
+
 static int process_frame(pcap_t *foo) {
 	struct pcap_pkthdr h;
 	const unsigned char* data = pcap_next_wrapper(foo, &h);
 	if(data) {
+		if(console_getbackendtype(t) == cb_sdl) dump_packet(data, h.len);
 		struct ieee80211_radiotap_header *rh = (void*) data;
 		//size_t next_chunk = sizeof(*rh);
 		uint32_t flags = rh->it_present;
@@ -349,7 +394,6 @@ static int next_chan(int chan) {
 	}
 }
 
-static Console co, *t = &co;
 static struct {int w, h;} dim;
 
 #define BGCOL RGB(33, 66, 133)
