@@ -507,8 +507,21 @@ static void dump(void) {
 
 static void initconcol() {
 	console_init(t);
-	point reso = {800, 600};
-//	point reso = {1280, 600};
+	char *p;
+	int rw=1024,rh=768;
+	if((p = getenv("RES"))) {
+		char *q = strchr(p, 'x');
+		if(q) {
+			unsigned l = q-p;
+			char b[64];
+			memcpy(b,p,l);
+			b[l] = 0;
+			rw=atoi(b);
+			strcpy(b,++q);
+			rh=atoi(b);
+		}
+	}
+	point reso = {rw, rh};
 	console_init_graphics(&co, reso, FONT);
         console_getbounds(t, &dim.w, &dim.h);
 #ifdef NO_COLOR
