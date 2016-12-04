@@ -336,8 +336,6 @@ static int process_frame(pcap_t *foo) {
 			assert(flags & (1U << IEEE80211_RADIOTAP_DBM_ANTSIGNAL));
 			unsigned dbmoff = get_dbm_off(flags);
 			temp.last_rssi = ((signed char*)data)[sizeof(*rh) + dbmoff];
-			min = MIN(min, temp.last_rssi);
-			if(temp.last_rssi > max) max++;
 		}
 		{
 			assert(flags & (1U << IEEE80211_RADIOTAP_CHANNEL));
@@ -376,6 +374,12 @@ static int process_frame(pcap_t *foo) {
 					assert(curr_tag[1] == 1);
 					temp.channel = curr_tag[2];
 				}
+
+				min = MIN(min, temp.last_rssi);
+#ifdef DEBUG
+				if(MAX(max, temp.last_rssi) > max) dprintf(2, "got %d, want %d\n", (int) max, (int) MAX(max, temp.last_rssi));
+#endif
+				max = MAX(max, temp.last_rssi);
 
 				return set_rssi(&temp);
 
