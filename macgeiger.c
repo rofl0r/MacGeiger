@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <fcntl.h>
 #define LIBRARY_CODE
 #include "channel-switch.c"
 
@@ -49,6 +50,8 @@
 #ifdef NO_COLOR
 #define console_setcolor(A, B, C) do {} while(0)
 #endif
+
+static int outfd;
 
 static int usage(void) {
 	dprintf(2, "prog network-if\n");
@@ -229,7 +232,25 @@ static long long getutime64(void) {
 static int filebased;
 
 static const unsigned char* pcap_next_wrapper(pcap_t *foo, struct pcap_pkthdr *h_out) {
-	if(!filebased) return pcap_next(foo, h_out);
+	if(!filebased) {
+		unsigned char * ret = pcap_next(foo, h_out);
+		if(ret && outfd != -1){
+			struct pcap_file_pkthdr {
+				unsigned sec_epoch;
+				unsigned ms_sec;
+				unsigned caplen;
+				unsigned len;
+			} hdr_out = {
+				.sec_epoch = h_out->ts.tv_sec,
+				.ms_sec = h_out->ts.tv_usec,
+				.caplen = h_out->caplen,
+				.len = h_out->len,
+			};
+			write(outfd, &hdr_out, sizeof hdr_out);
+			write(outfd, ret, h_out->len);
+		}
+		return ret;
+	}
 	static long long pcap_file_start_time, start_time;
 	static unsigned char buf[2][2048];
 	static struct pcap_pkthdr h[2];
@@ -663,6 +684,7 @@ int main(int argc,char**argv) {
 	if(argc == 1) return usage();
 	min = 127;
 	max = -127;
+	outfd = -1;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *foo;
 	if(strchr(argv[1], '.') && access(argv[1], R_OK) == 0) {
@@ -670,6 +692,11 @@ int main(int argc,char**argv) {
 		foo = pcap_open_offline(argv[1], errbuf);
 	} else {
 		foo = pcap_create(argv[1], errbuf);
+		outfd= open("tmp.pcap", O_WRONLY|O_CREAT|O_TRUNC,0660);
+		if(outfd != -1)
+			write(outfd, "\x4D\x3C\xB2\xA1" "\x02\x00\x04\x00"
+			             "\x00\x00\x00\x00" "\x00\x00\x00\x00"
+			             "\x00\x00\x04\x00" "\x7F\x00\x00\x00", 24);
 	}
 	if(!foo) { dprintf(2, "%s\n", errbuf); return 1; }
 
@@ -748,5 +775,6 @@ int main(int argc,char**argv) {
 
 	pcap_close(foo);
 	console_cleanup(t);
+	if(outfd != -1) close(outfd);
 	return 0;
 }
