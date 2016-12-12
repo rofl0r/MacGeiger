@@ -406,7 +406,15 @@ static int next_chan(int chan) {
 	if(++chan > 11) chan = 1;
 	return chan;
 }
-#endif
+#elif 1
+static int next_chan(int chan) {
+	static char chanlist[]={1,5,9,13,2,6,10,14,3,7,11,4,8,12};
+	int i = 0;
+	for(i = 0; i < sizeof chanlist && chanlist[i] != chan; i++);
+	if(i >=13) return chanlist[0];
+	return chanlist[++i];
+}
+#else
 static int next_chan(int chan) {
 	switch (chan) {
 		case 1: case 2: case 3: case 4: case 5:
@@ -423,6 +431,7 @@ static int next_chan(int chan) {
 			return 0;
 	}
 }
+#endif
 
 static struct {int w, h;} dim;
 
