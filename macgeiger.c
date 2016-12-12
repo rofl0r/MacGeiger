@@ -233,7 +233,12 @@ static int filebased;
 
 static const unsigned char* pcap_next_wrapper(pcap_t *foo, struct pcap_pkthdr *h_out) {
 	if(!filebased) {
-		unsigned char * ret = pcap_next(foo, h_out);
+		const unsigned char* ret = 0;
+		struct pcap_pkthdr *hdr_temp;
+		int err = pcap_next_ex(foo, &hdr_temp, &ret);
+		if(err == 1) {
+			*h_out = *hdr_temp;
+		} else ret = 0;
 		if(ret && outfd != -1){
 			struct pcap_file_pkthdr {
 				unsigned sec_epoch;
@@ -723,6 +728,9 @@ int main(int argc,char**argv) {
 	if(pcap_activate(foo)) {
 		dprintf(2, "pcap_activate failed: %s\n", pcap_geterr(foo));
 		return 1;
+	}
+	if(pcap_setnonblock(foo, 1, errbuf) == -1) {
+		dprintf(2, "pcap_setnonblocking failed: %s\n", errbuf);
 	}
 
 	skip:;
