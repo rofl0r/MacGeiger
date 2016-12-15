@@ -597,33 +597,42 @@ int AoWriter_close(struct AoWriter *self) {
 }
 
 static unsigned char blip[] = {0x52, 0x51, 0x51, 0x51, 0xC4, 0x4C, 0xF4, 0xF4, 0xF3,0xEF};
-static int blip_frame(int idx) {
+static unsigned blip_frame(int idx) {
 	idx = idx % (2*sizeof(blip));
 	if(idx>=sizeof(blip)) idx=(2*sizeof(blip))-idx;
-	return(int) ((float) blip[idx] * 1.8f);
+	return blip[idx];
 }
 
-static void generate_blip(unsigned char* data, size_t bufsize, double volume) {
+static volatile float volume = .5;
+
+static void generate_blip(unsigned char* data, size_t bufsize) {
         int i;
-        for(i=0;i<bufsize;i++)
-#if 0
-		data[i] = (blip_frame(i)-128)*volume+127;
-#else
-		data[i] = blip_frame(i)*volume;
-#endif
+        for(i=0;i<bufsize;i++) {
+		float f = blip_frame(i) * volume;
+		data[i] = f;
+	}
 }
 
-#define DEFAULT_VOLUME 0.02
+static void volume_change(int dir) {
+	volume += dir * 0.1;
+	if(volume < 0) volume = 0;
+	if(volume > 1) volume = 1;
+}
 
 static void* blip_thread(void* arg) {
 	struct AoWriter ao;
 	AoWriter_init(&ao);
 	unsigned char buf[100], silence[1000];
-	generate_blip(buf, sizeof(buf), DEFAULT_VOLUME);
+	generate_blip(buf, sizeof(buf));
 	memset(silence, buf[99], sizeof silence);
 	long long t = getutime64();
 	unsigned passed = 0;
+	float myvol = volume;
 	while(selected) {
+		if(myvol != volume) {
+			generate_blip(buf, sizeof(buf));
+			myvol = volume;
+		}
 		if(bms && (getutime64() - t)/1000 >= bms) {
 			AoWriter_write(&ao, buf, sizeof buf);
 			t = getutime64();
@@ -762,7 +771,10 @@ int main(int argc,char**argv) {
 			dump();
 		}
 		int k = console_getkey_nb(t);
+
 		switch(k) {
+			case '+': case '0': volume_change(+1); break;
+			case '-': case '9': volume_change(-1); break;
 			case CK_CURSOR_DOWN: selection_move(1);break;
 			case CK_CURSOR_UP: selection_move(-1);break;
 			case CK_RETURN:
