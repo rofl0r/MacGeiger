@@ -479,11 +479,24 @@ static void set_bms(float percent) {
 	bms = min + (100 - percent) * rpercent;
 }
 
+char *mac2str(unsigned char mac[static 6], char buf[static 18]) {
+	unsigned m, x;
+	char hextab[16] = "0123456789abcdef";
+	for(m = 0, x=0 ; m<6; m++, x+=3) {
+		buf[x] = hextab[mac[m]>>4];
+		buf[x+1] = hextab[mac[m]&15];
+		buf[x+2] = ':';
+	}
+	buf[17]=0;
+	return buf;
+}
+
 #define ESSID_PRINT_START 1
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
 static void dump_wlan(unsigned idx) {
 	struct wlaninfo *w = &wlans[idx];
+	char macbuf[18];
 	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
 	long long now = getutime64();
 	long long age_ms = (now - w->last_seen)/1000;
@@ -502,7 +515,10 @@ static void dump_wlan(unsigned idx) {
 	unsigned a = get_a(age_ms);
 	console_setcolor(t, 1, RGB(a,a,a));
 	console_goto(t, ESSID_PRINT_START, idx*LINES_PER_NET);
-	console_printf(t, "%*s", ESSID_PRINT_LEN, w->essid);
+	if(*w->essid)
+		console_printf(t, "%*s", ESSID_PRINT_LEN, w->essid);
+	else
+		console_printf(t, "<hidden> %*s", ESSID_PRINT_LEN-9, mac2str(w->mac, macbuf));
 
 
 	console_goto(t, ESSID_PRINT_END +1, idx*LINES_PER_NET);
