@@ -332,21 +332,24 @@ static int process_frame(pcap_t *foo) {
 		if(console_getbackendtype(t) == cb_sdl) dump_packet(data, h.len);
 		struct ieee80211_radiotap_header *rh = (void*) data;
 		//size_t next_chunk = sizeof(*rh);
-		uint32_t flags = rh->it_present;
-		//assert(!(flags & (1U << IEEE80211_RADIOTAP_EXT)));
-		if(flags & (1U << IEEE80211_RADIOTAP_EXT)) return -1;
+		uint32_t flags = rh->it_present, flags_copy = flags;
+		unsigned ext_bytes = 0;
+		while(flags_copy & (1U << IEEE80211_RADIOTAP_EXT)) {
+			memcpy(&flags_copy, data+sizeof(*rh)+ext_bytes, 4);
+			ext_bytes += 4;
+		}
 
 		struct wlaninfo temp = {0};
 		{
 			assert(flags & (1U << IEEE80211_RADIOTAP_DBM_ANTSIGNAL));
 			unsigned dbmoff = get_dbm_off(flags);
-			temp.last_rssi = ((signed char*)data)[sizeof(*rh) + dbmoff];
+			temp.last_rssi = ((signed char*)data)[sizeof(*rh) + ext_bytes + dbmoff];
 		}
 		{
 			assert(flags & (1U << IEEE80211_RADIOTAP_CHANNEL));
 			short freq;
 			unsigned chanoff = get_chan_off(flags);
-			memcpy(&freq, data+sizeof(*rh) + chanoff, 2);
+			memcpy(&freq, data+sizeof(*rh) + ext_bytes + chanoff, 2);
 			temp.channel = channel_from_freq(freq);
 		}
 		uint16_t framectl;
