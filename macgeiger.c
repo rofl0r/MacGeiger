@@ -341,12 +341,12 @@ static int process_frame(pcap_t *foo) {
 
 		struct wlaninfo temp = {0};
 		{
-			assert(flags & (1U << IEEE80211_RADIOTAP_DBM_ANTSIGNAL));
+			if(!(flags & (1U << IEEE80211_RADIOTAP_DBM_ANTSIGNAL))) return -1;
 			unsigned dbmoff = get_dbm_off(flags);
 			temp.last_rssi = ((signed char*)data)[sizeof(*rh) + ext_bytes + dbmoff];
 		}
 		{
-			assert(flags & (1U << IEEE80211_RADIOTAP_CHANNEL));
+//			if(!(flags & (1U << IEEE80211_RADIOTAP_CHANNEL))) return -1;
 			short freq;
 			unsigned chanoff = get_chan_off(flags);
 			memcpy(&freq, data+sizeof(*rh) + ext_bytes + chanoff, 2);
