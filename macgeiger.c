@@ -329,7 +329,7 @@ static int process_frame(pcap_t *foo) {
 	struct pcap_pkthdr h;
 	const unsigned char* data = pcap_next_wrapper(foo, &h);
 	if(data) {
-		if(console_getbackendtype(t) == cb_sdl) dump_packet(data, h.len);
+		if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
 		struct ieee80211_radiotap_header *rh = (void*) data;
 		//size_t next_chunk = sizeof(*rh);
 		uint32_t flags = rh->it_present, flags_copy = flags;
