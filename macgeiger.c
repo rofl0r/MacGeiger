@@ -239,9 +239,9 @@ struct beaconframe {
 	uint16_t sequence_no;
 };
 
-static unsigned const char* find_tag(unsigned const char *tagdata, unsigned tag, unsigned bytes_left) {
+static unsigned char* find_tag(unsigned const char *tagdata, unsigned tag, unsigned bytes_left) {
 	while(bytes_left) {
-		if(*tagdata == tag) return tagdata;
+		if(*tagdata == tag) return (unsigned char*)tagdata;
 		unsigned tagsize = tagdata[1];
 		tagdata+=2+tagsize;
 		bytes_left-=2+tagsize;
@@ -318,7 +318,7 @@ static inline int myisascii(int x) {
 	return x >= ' ' && x < 127;
 }
 
-static void dump_packet(unsigned char* data, size_t len) {
+static void dump_packet(const unsigned char* data, size_t len) {
 	static const char atab[] = "0123456789abcdef";
 	char hex[24*2+1], ascii[24+1];
 	unsigned h = 0, a = 0;
@@ -395,7 +395,7 @@ static int process_frame(pcap_t *foo) {
 		uint16_t framectl;
 		memcpy(&framectl, data+rh->it_len, 2);
 		struct beaconframe* beacon;
-		unsigned char* tagdata, *curr_tag;
+		unsigned const char* tagdata, *curr_tag;
 		unsigned pos;
 		switch(htons(framectl)) {
 			/* IEEE 802.11 packet type */
