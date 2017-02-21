@@ -524,34 +524,37 @@ char *mac2str(unsigned char mac[static 6], char buf[static 18]) {
 #define ESSID_PRINT_START 1
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
-static void dump_wlan(unsigned idx) {
-	struct wlaninfo *w = &wlans[idx];
-	char macbuf[18];
-	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
-	long long now = getutime64();
-	long long age_ms = (now - w->last_seen)/1000;
-	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
 
-	console_goto(t, 0, idx*LINES_PER_NET);
+static void dump_wlan_at(unsigned wlanidx, unsigned line) {
+	console_goto(t, 0, line);
 	console_setcolor(t, 0, BGCOL);
 
 	console_setcolor(t, 1, RGB(255,255,0));
-	if(idx == selection) {
+	if(wlanidx == selection) {
 		console_printchar(t, '>', 0);
 	} else {
 		console_printchar(t, ' ', 0);
 	}
 
+	struct wlaninfo *w = &wlans[wlanidx];
+
+	long long now = getutime64();
+	long long age_ms = (now - w->last_seen)/1000;
+	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
 	unsigned a = get_a(age_ms);
+
 	console_setcolor(t, 1, RGB(a,a,a));
-	console_goto(t, ESSID_PRINT_START, idx*LINES_PER_NET);
+	console_goto(t, ESSID_PRINT_START, line);
+
+	char macbuf[18];
+
 	if(*w->essid)
 		console_printf(t, "%*s", ESSID_PRINT_LEN, w->essid);
 	else
 		console_printf(t, "<hidden> %*s", ESSID_PRINT_LEN-9, mac2str(w->mac, macbuf));
 
+	console_goto(t, ESSID_PRINT_END +1, line);
 
-	console_goto(t, ESSID_PRINT_END +1, idx*LINES_PER_NET);
 	int scale = max - min;
 	int width = dim.w - (ESSID_PRINT_LEN+2);
 	unsigned x;
@@ -567,7 +570,7 @@ static void dump_wlan(unsigned idx) {
 	int curr_marker = ((float)w->last_rssi - (float)min) * scaleup;
 	for(x = 0; x < width; x++) {
 		rgb_t step_color;
-		if(idx == selection) step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
+		if(wlanidx == selection) step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
 		else step_color = RGB(get_r(x/widthpercent),get_r(x/widthpercent),get_r(x/widthpercent));
 		console_setcolor(t, 0, step_color);
 		if(x != curr_marker) console_setcolor(t, 1, RGB(0,0,0));
@@ -578,6 +581,11 @@ static void dump_wlan(unsigned idx) {
 		else if(x == width-1) console_printchar(t, ']', 0);
 		else console_printchar(t, ' ', 0);
 	}
+}
+
+static void dump_wlan(unsigned idx) {
+	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
+	dump_wlan_at(idx, idx * LINES_PER_NET);
 }
 #endif
 
