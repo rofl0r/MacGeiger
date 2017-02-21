@@ -586,8 +586,6 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	double avg = (double)w->total_rssi/(double)w->count;
 	float avg_percent = (avg - (float)min) / scalepercent;
 	float curr_percent = ((float)w->last_rssi - (float)min) / scalepercent;
-	if(age_ms == 0) set_bms(curr_percent);
-	else bms = 0;
 	int avg_marker = (avg - (float)min) * scaleup;
 	int curr_marker = ((float)w->last_rssi - (float)min) * scaleup;
 	for(x = 0; x < width; x++) {
@@ -611,6 +609,18 @@ static void dump_wlan(unsigned idx) {
 	if(selected) dump_wlan_info(idx);
 }
 #endif
+
+static void calc_bms(unsigned wlanidx) {
+	long long now = getutime64();
+	struct wlaninfo *w = &wlans[wlanidx];
+	long long age_ms = (now - w->last_seen)/1000;
+	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
+	int scale = max - min;
+	float scalepercent = (float)scale/100.f;
+	float curr_percent = ((float)w->last_rssi - (float)min) / scalepercent;
+	if(age_ms < 25) set_bms(curr_percent);
+	else bms = 0;
+}
 
 static void dump(void) {
 	unsigned i;
@@ -847,6 +857,7 @@ int main(int argc,char**argv) {
 			tm = tmp;
 			dump();
 		}
+		if(selected) calc_bms(selection);
 		int k = console_getkey_nb(t);
 
 		switch(k) {
