@@ -219,15 +219,7 @@ static unsigned get_chan_off(unsigned flags, unsigned start_off) {
 }
 
 static unsigned channel_from_freq(unsigned freq) {
-	static const short chan_freqs[] = {
-		[1] = 2412, [2] = 2417, [3] = 2422, [4] = 2427, [5] = 2432, [6] = 2437,
-		[7] = 2442, [8] = 2447, [9] = 2452, [10] = 2457, [11] = 2462, [12] = 2467,
-		[13] = 2472, [14] = 2484 /* chan 14 only used in japan */
-	};
-	unsigned i;
-	for(i = 1; i < sizeof(chan_freqs)/sizeof(chan_freqs[0]); i++)
-		if(chan_freqs[i] == freq) return i;
-	return 0;
+	return freq==2484?14:(freq-2407)/5;
 }
 
 struct beaconframe {
