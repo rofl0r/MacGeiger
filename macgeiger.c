@@ -525,6 +525,28 @@ char *mac2str(unsigned char mac[static 6], char buf[static 18]) {
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
 
+static void dump_wlan_info(unsigned wlanidx) {
+	struct wlaninfo *w = &wlans[wlanidx];
+	unsigned line = 3;
+	console_setcolor(t, 0, BGCOL);
+	console_setcolor(t, 1, RGB(0xff,0xff,0xff));
+
+	console_goto(t, ESSID_PRINT_END +1, line);
+	char macbuf[18];
+	console_printf(t, "MAC %s", mac2str(w->mac, macbuf));
+
+	console_goto(t, ESSID_PRINT_END +1+25, line);
+	console_printf(t, "CHAN %d", (int) w->channel);
+
+	line++;
+
+	console_goto(t, ESSID_PRINT_END +1, line);
+	console_printf(t, "AVG %.2f dBm", (double)w->total_rssi/(double)w->count);
+
+	console_goto(t, ESSID_PRINT_END +1+25, line);
+	console_printf(t, "CURR %d dBm", w->last_rssi);
+}
+
 static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	console_goto(t, 0, line);
 	console_setcolor(t, 0, BGCOL);
@@ -585,7 +607,8 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 
 static void dump_wlan(unsigned idx) {
 	if(idx * LINES_PER_NET + 1 > dim.h || (selected && selection != idx)) return;
-	dump_wlan_at(idx, idx * LINES_PER_NET);
+	dump_wlan_at(idx, selected ? 1 : idx * LINES_PER_NET);
+	if(selected) dump_wlan_info(idx);
 }
 #endif
 
