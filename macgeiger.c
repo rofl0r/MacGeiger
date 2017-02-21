@@ -356,6 +356,14 @@ static void dump_packet(unsigned char* data, size_t len) {
 	goto filler;
 }
 
+void setminmax(int val) {
+	min = MIN(min, val);
+	max = MAX(max, val);
+	char mmbuf[128];
+	snprintf(mmbuf, sizeof mmbuf, "min: %d, max: %d", min, max);
+	console_settitle(t, mmbuf);
+}
+
 static int process_frame(pcap_t *foo) {
 	struct pcap_pkthdr h;
 	const unsigned char* data = pcap_next_wrapper(foo, &h);
@@ -414,12 +422,7 @@ static int process_frame(pcap_t *foo) {
 					assert(curr_tag[1] == 1);
 					temp.channel = curr_tag[2];
 				}
-
-				min = MIN(min, temp.last_rssi);
-#ifdef DEBUG
-				if(MAX(max, temp.last_rssi) > max) dprintf(2, "got %d, want %d\n", (int) max, (int) MAX(max, temp.last_rssi));
-#endif
-				max = MAX(max, temp.last_rssi);
+				setminmax(temp.last_rssi);
 
 				return set_rssi(&temp);
 
