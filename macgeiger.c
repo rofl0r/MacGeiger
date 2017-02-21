@@ -497,7 +497,8 @@ static int get_a(unsigned age) {
 #define LINES_PER_NET 1
 static void selection_move(int dir) {
 	if((int)selection+dir < 0) dir=0;
-	if(((int)selection+dir)*LINES_PER_NET+1 > dim.h) dir=0;
+	if((int)selection+dir >= wlan_count ||
+	   ((int)selection+dir)*LINES_PER_NET+1 >= dim.h) dir=0;
 	selection += dir;
 }
 
