@@ -32,7 +32,7 @@ how to build from release tarball:
 ----------------------------------
 
 just run `make`. if you need to change variables, CFLAGS, etc, do so by
-creating a file called `config.mak' and override the settings there.
+creating a file called `config.mak` and override the settings there.
 you may also use it to change `BACKEND` to `SDL`.
 by default the ncurses version will be built since it is assumed it is more
 widely available.
