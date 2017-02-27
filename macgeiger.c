@@ -44,7 +44,6 @@
 
 #include "../concol/console.h"
 #include "../concol/console_keys.h"
-#define CONSOLE_FONT TESTFONT
 #include "../concol/fonts/allfonts.h"
 
 #ifdef NO_COLOR
