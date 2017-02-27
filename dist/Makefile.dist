@@ -1,0 +1,45 @@
+# this is the Makefile for release tarballs. unlike the Makefile in the git
+# repo, this one is intended to be used without dependence on any other
+# build tools.
+# if you want to change/override some variables, do so in a file called
+# config.mak, which is gets included automatically if it exists.
+
+prefix = /usr/local
+bindir = $(prefix)/bin
+
+PROG = macgeiger
+SRCS =  macgeiger.c
+OBJS = $(SRCS:.c=.o)
+
+LIBS = -lao -lpcap -lpthread
+
+CFLAGS += -Wall -Wno-unused -D_GNU_SOURCE -std=c99
+
+-include config.mak
+
+# defaulting to NCURSES backend, since that's more likely to be installed
+# than SDL 1.2.
+
+BACKEND ?= NCURSES
+CONCOL_BASEDIR=concol
+
+include $(CONCOL_BASEDIR)/dist/concol.mak
+
+all: $(PROG)
+
+install: $(PROG)
+	install -d $(DESTDIR)/$(bindir)
+	install -D -m 755 $(PROG) $(DESTDIR)/$(bindir)/$(PROG)
+
+clean:
+	rm -f $(PROG)
+	rm -f $(OBJS)
+
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) $(PIC) -c -o $@ $<
+
+$(PROG): $(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
+
+.PHONY: all clean install
+
