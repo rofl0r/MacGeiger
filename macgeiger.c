@@ -52,8 +52,10 @@
 
 static int outfd;
 
-static int usage(void) {
-	dprintf(2, "prog network-if\n");
+static int usage(const char *argv0) {
+	dprintf(2, "%s network-interface\n"
+		   "i.e.: %s wlan0\n", argv0, argv0
+		);
 	return 1;
 }
 
@@ -795,7 +797,7 @@ static int setiwmode(const char *dev, int mode) {
 	return ret;
 }
 int main(int argc,char**argv) {
-	if(argc == 1) return usage();
+	if(argc == 1) return usage(argv[0]);
 	min = 127;
 	max = -127;
 	outfd = -1;
