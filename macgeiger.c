@@ -27,6 +27,8 @@
 #include <ctype.h>
 #include <fcntl.h>
 
+#define GUI_FPS 40
+
 //RcB: DEP "audio-backend.c"
 #include "audio-backend.c"
 
@@ -833,7 +835,7 @@ int main(int argc,char**argv) {
 		int ret = process_frame(foo);
 		long long tmp = getutime64();
 		if(ret >= 0) wlans[ret].last_seen = tmp;
-		if((tmp-tm) >= 20*1000) {
+		if((tmp-tm) >= (1000000 / GUI_FPS)) {
 			tm = tmp;
 			dump();
 		}
