@@ -71,7 +71,7 @@ static struct wlaninfo {
 	long long last_seen;
 	unsigned long count;
 	int last_rssi;
-} wlans[32];
+} wlans[128];
 static unsigned wlan_count;
 
 static signed char min, max;
