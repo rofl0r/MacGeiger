@@ -74,6 +74,10 @@ static struct wlaninfo {
 } wlans[128];
 static unsigned wlan_count;
 
+static pthread_mutex_t wlan_lock = PTHREAD_MUTEX_INITIALIZER;
+#define lock() pthread_mutex_lock(&wlan_lock)
+#define unlock() pthread_mutex_unlock(&wlan_lock)
+
 static signed char min, max;
 static unsigned char selection, selected;
 static Console co, *t = &co;
@@ -101,6 +105,7 @@ static int get_new_wlan(void) {
 static int set_rssi(struct wlaninfo *w) {
 	int i = -1;
 //	if(w->essid[0]) i = get_wlan_by_essid(w->essid);
+	lock();
 	if(i == -1) i = get_wlan_by_mac(w->mac);
 	if(i == -1) i = get_new_wlan();
 	if(i != -1) {
@@ -112,10 +117,11 @@ static int set_rssi(struct wlaninfo *w) {
 		d->last_rssi = w->last_rssi;
 		d->channel = w->channel;
 	}
+	unlock();
 	return i;
 }
 
-int stop;
+volatile int stop;
 void sigh(int x) {
 	stop = 1;
 }
@@ -535,6 +541,7 @@ char *mac2str(unsigned char mac[static 6], char buf[static 18]) {
 
 static void dump_wlan_info(unsigned wlanidx) {
 	struct wlaninfo *w = &wlans[wlanidx];
+	lock();
 	unsigned line = 3;
 	console_setcolor(t, 0, BGCOL);
 	console_setcolor(t, 1, RGB(0xff,0xff,0xff));
@@ -553,6 +560,7 @@ static void dump_wlan_info(unsigned wlanidx) {
 
 	console_goto(t, ESSID_PRINT_END +1+25, line);
 	console_printf(t, "CURR %d dBm", w->last_rssi);
+	unlock();
 }
 
 static void dump_wlan_at(unsigned wlanidx, unsigned line) {
@@ -567,6 +575,8 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	}
 
 	struct wlaninfo *w = &wlans[wlanidx];
+
+	lock();
 
 	long long now = getutime64();
 	long long age_ms = (now - w->last_seen)/1000;
@@ -596,6 +606,9 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	float curr_percent = ((float)w->last_rssi - (float)min) / scalepercent;
 	int avg_marker = (avg - (float)min) * scaleup;
 	int curr_marker = ((float)w->last_rssi - (float)min) * scaleup;
+
+	unlock();
+
 	for(x = 0; x < width; x++) {
 		rgb_t step_color;
 		if(wlanidx == selection) step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
@@ -621,7 +634,9 @@ static void dump_wlan(unsigned idx) {
 static void calc_bms(unsigned wlanidx) {
 	long long now = getutime64();
 	struct wlaninfo *w = &wlans[wlanidx];
+	lock();
 	long long age_ms = (now - w->last_seen)/1000;
+	unlock();
 	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
 	int scale = max - min;
 	float scalepercent = (float)scale/100.f;
@@ -780,6 +795,21 @@ static int setiwmode(const char *dev, int mode) {
 	close(fd);
 	return ret;
 }
+
+static void* capture_thread(void*arg) {
+	pcap_t *foo = arg;
+	while(!stop) {
+		int ret = process_frame(foo);
+		long long tmp = getutime64();
+		if(ret >= 0) {
+			lock();
+			wlans[ret].last_seen = tmp;
+			unlock();
+		}
+	}
+	return 0;
+}
+
 int main(int argc,char**argv) {
 	if(argc == 1) return usage(argv[0]);
 	min = 127;
@@ -820,9 +850,6 @@ int main(int argc,char**argv) {
 		dprintf(2, "pcap_activate failed: %s\n", pcap_geterr(foo));
 		return 1;
 	}
-	if(pcap_setnonblock(foo, 1, errbuf) == -1) {
-		dprintf(2, "pcap_setnonblocking failed: %s\n", errbuf);
-	}
 
 	skip:;
 
@@ -832,17 +859,17 @@ int main(int argc,char**argv) {
 
 	int channel = 1;
 	long long tm = 0;
-	pthread_t bt, wt;
+	pthread_t bt, wt, ct;
 	pthread_create(&wt, 0, chanwalker_thread, argv[1]);
+	pthread_create(&ct, 0, capture_thread, foo);
 
 	while(!stop) {
-		int ret = process_frame(foo);
 		long long tmp = getutime64();
-		if(ret >= 0) wlans[ret].last_seen = tmp;
 		if((tmp-tm) >= (1000000 / GUI_FPS)) {
 			tm = tmp;
 			dump();
 		}
+
 		if(selected) calc_bms(selection);
 		int k = console_getkey_nb(t);
 
@@ -866,7 +893,11 @@ int main(int argc,char**argv) {
 			case CK_QUIT:
 			case CK_ESCAPE: stop = 1; break;
 		}
+		usleep(1000);
 	}
+
+	pcap_breakloop(foo); // this doesn't actually seem to work
+
 	if(selected) {
 		selected = 0;
 		pthread_join(bt, 0);
@@ -874,11 +905,20 @@ int main(int argc,char**argv) {
 		selected = 1;
 		pthread_join(wt, 0);
 	}
+
+	// since our capture_thread uses blocking reads in order to keep CPU usage
+	// minimal, we need to get the current read cancelled - and if no packets
+	// arrive, this can take a *long* time. since pcap_breakloop() doesn't actually
+	// seem to work, the only way i found to break out of the read is to actually
+	// bring down the interface - so this must happen before we join the thread
+	// and close the pcap handle.
 	if(!filebased) {
 		if(wasdown || orgmode != IW_MODE_MONITOR) ifdownup(argv[1], 0, 0);
 		if(orgmode != IW_MODE_MONITOR) setiwmode(argv[1], orgmode);
 		if(!wasdown && orgmode != IW_MODE_MONITOR) ifdownup(argv[1], 1, 0);
 	}
+
+	pthread_join(ct, 0);
 
 	pcap_close(foo);
 	console_cleanup(t);
