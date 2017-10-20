@@ -716,12 +716,16 @@ static void* blip_thread(void* arg) {
 static void* chanwalker_thread(void* arg) {
 	char* itf = arg;
 	int channel = 1, delay = 800;
-	long long t = 0;
+	long long tm = 0;
 	if(filebased) return 0;
 	while(!selected) {
-		if((getutime64() - t)/1000 >= delay) {
-			set_channel(itf, channel = next_chan(channel));
-			t = getutime64();
+		if((getutime64() - tm)/1000 >= delay) {
+			int ret = set_channel(itf, channel = next_chan(channel));
+			if(ret == -1) {
+				if(console_getbackendtype(t) == cb_sdl)
+					dprintf(2, "oops couldnt switch to chan %d\n", channel);
+			}
+			tm = getutime64();
 		}
 		usleep(1000);
 	}
