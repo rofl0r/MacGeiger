@@ -26,6 +26,10 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <fcntl.h>
+
+//RcB: DEP "audio-backend.c"
+#include "audio-backend.c"
+
 #define LIBRARY_CODE
 #include "channel-switch.c"
 
@@ -38,9 +42,7 @@
 #endif
 
 //RcB: LINK "-lpcap"
-//RcB: LINK "-lao"
 //RcB: LINK "-lpthread"
-#include <ao/ao.h>
 
 #include "../concol/console.h"
 #include "../concol/console_keys.h"
@@ -661,32 +663,6 @@ static void initconcol() {
 	draw_bg();
 }
 
-struct AoWriter {
-	ao_device *device;
-	ao_sample_format format;
-	int aodriver;
-};
-
-int AoWriter_init(struct AoWriter *self) {
-	ao_initialize();
-	memset(self, 0, sizeof(*self));
-	self->format.bits = 8;
-	self->format.channels = 1;
-	self->format.rate = 11025;
-	self->format.byte_format = AO_FMT_LITTLE;
-	self->aodriver = ao_default_driver_id();
-	self->device = ao_open_live(self->aodriver, &self->format, NULL);
-	return self->device != NULL;
-}
-
-int AoWriter_write(struct AoWriter *self, void* buffer, size_t bufsize) {
-	return ao_play(self->device, buffer, bufsize);
-}
-
-int AoWriter_close(struct AoWriter *self) {
-	return ao_close(self->device);
-}
-
 static unsigned char blip[] = {0x52, 0x51, 0x51, 0x51, 0xC4, 0x4C, 0xF4, 0xF4, 0xF3,0xEF};
 static unsigned blip_frame(int idx) {
 	idx = idx % (2*sizeof(blip));
@@ -711,8 +687,8 @@ static void volume_change(int dir) {
 }
 
 static void* blip_thread(void* arg) {
-	struct AoWriter ao;
-	AoWriter_init(&ao);
+	struct AudioCTX ao;
+	audio_init(&ao);
 	unsigned char buf[100], silence[1000];
 	generate_blip(buf, sizeof(buf));
 	memset(silence, buf[99], sizeof silence);
@@ -725,13 +701,13 @@ static void* blip_thread(void* arg) {
 			myvol = volume;
 		}
 		if(bms && (getutime64() - t)/1000 >= bms) {
-			AoWriter_write(&ao, buf, sizeof buf);
+			audio_write(&ao, buf, sizeof buf);
 			t = getutime64();
 		}
-		AoWriter_write(&ao, silence, sizeof silence);
+		audio_write(&ao, silence, sizeof silence);
 		usleep(1);
 	}
-	AoWriter_close(&ao);
+	audio_close(&ao);
 	return 0;
 }
 
