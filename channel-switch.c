@@ -18,7 +18,11 @@ int set_channel(const char* iface, int channel) {
 	snprintf(req.ifr_name, IFNAMSIZ, "%s", iface);
 
 	int ret;
-	if((ret = ioctl(s, SIOCSIWFREQ, &req) < 0)) perror("ioctl");
+	if((ret = ioctl(s, SIOCSIWFREQ, &req) < 0)) {
+#ifndef LIBRARY_CODE
+		perror("ioctl");
+#endif
+	}
 	close(s);
 	return ret;
 }
