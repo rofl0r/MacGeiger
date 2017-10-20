@@ -779,7 +779,7 @@ static int setiwmode(const char *dev, int mode) {
 int main(int argc,char**argv) {
 	if(argc == 1) return usage(argv[0]);
 	min = 127;
-	max = -127;
+	max = -60;
 	outfd = -1;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *foo;
