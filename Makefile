@@ -9,7 +9,14 @@ CFLAGS_OPT=-s -Os
 CFLAGS_RCB_OPT=${CFLAGS_OWN} ${CFLAGS_OPT} ${CFLAGS}
 CFLAGS_RCB_DBG=${CFLAGS_OWN} ${CFLAGS_DBG} ${CFLAGS}
 
-all:
+SRCS=$(FNAME).c audio-backend.c channel-switch.c
+
+all: $(FNAME).out
+
+$(FNAME).rcb: config.mak
+	CFLAGS="${CFLAGS_RCB_DBG}" rcb --force --new $(RCBFLAGS) $(FNAME).c
+
+$(FNAME).out: $(SRCS) $(FNAME).rcb
 	CFLAGS="${CFLAGS_RCB_DBG}" rcb --force $(RCBFLAGS) $(FNAME).c
 
 clean:
