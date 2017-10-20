@@ -624,7 +624,7 @@ static void calc_bms(unsigned wlanidx) {
 	int scale = max - min;
 	float scalepercent = (float)scale/100.f;
 	float curr_percent = ((float)w->last_rssi - (float)min) / scalepercent;
-	if(age_ms < 25) set_bms(curr_percent);
+	if(age_ms < 15) set_bms(curr_percent);
 	else bms = 0;
 }
 
