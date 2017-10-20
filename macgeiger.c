@@ -410,6 +410,7 @@ static int process_frame(pcap_t *foo) {
 				} else {
 					/* dubious beacon without essid */
 					dprintf(2, "XXX\n");
+					if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
 				}
 				curr_tag = find_tag(tagdata, 3, h.len-pos); /* find channel nr tag */
 				if(curr_tag) {
