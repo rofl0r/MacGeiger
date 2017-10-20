@@ -237,6 +237,7 @@ static unsigned char* find_tag(unsigned const char *tagdata, unsigned tag, unsig
 		if(*tagdata == tag) return (unsigned char*)tagdata;
 		unsigned tagsize = tagdata[1];
 		tagdata+=2+tagsize;
+		if(bytes_left < 2+tagsize) return 0;
 		bytes_left-=2+tagsize;
 	}
 	return 0;
