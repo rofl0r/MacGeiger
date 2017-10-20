@@ -51,22 +51,22 @@ struct SdlWriter {
 	SDL_AudioSpec fmt;
 };
 
-#define lock() pthread_mutex_lock(&self->cb_lock)
-#define unlock() pthread_mutex_unlock(&self->cb_lock)
+#define alock() pthread_mutex_lock(&self->cb_lock)
+#define aunlock() pthread_mutex_unlock(&self->cb_lock)
 
 static void sdl_callback(void *user, Uint8 *stream, int len) {
 	struct SdlWriter *self = user;
 	do {
-		lock();
+		alock();
 		if((size_t) len <= self->buffer_used) {
 			memcpy(stream, self->buffer, len);
 			size_t diff = self->buffer_used - len;
 			memmove(self->buffer, (char*)self->buffer + len, diff);
 			self->buffer_used = diff;
-			unlock();
+			aunlock();
 			return;
 		} else {
-			unlock();
+			aunlock();
 			usleep(1000);
 		}
 
@@ -75,19 +75,22 @@ static void sdl_callback(void *user, Uint8 *stream, int len) {
 
 int SdlWriter_write(struct SdlWriter *self, void* buffer, size_t bufsize) {
 	do {
-		lock();
+		alock();
 		if(self->buffer_used + bufsize > self->buffer_size) {
-			unlock();
+			aunlock();
 			usleep(1000);
 		} else {
 			memcpy((char*)self->buffer + self->buffer_used, buffer, bufsize);
 			self->buffer_used += bufsize;
-			unlock();
+			aunlock();
 			break;
 		}
 	} while(1);
 	return 1;
 }
+
+#undef alock
+#undef aunlock
 
 #define NUM_CHANNELS 2
 int SdlWriter_init(struct SdlWriter *self) {
