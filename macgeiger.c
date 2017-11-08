@@ -824,7 +824,7 @@ int main(int argc,char**argv) {
 		foo = pcap_create(argv[1], errbuf);
 		outfd= open("tmp.pcap", O_WRONLY|O_CREAT|O_TRUNC,0660);
 		if(outfd != -1)
-			write(outfd, "\x4D\x3C\xB2\xA1" "\x02\x00\x04\x00"
+			write(outfd, "\xD4\xC3\xB2\xA1" "\x02\x00\x04\x00"
 			             "\x00\x00\x00\x00" "\x00\x00\x00\x00"
 			             "\x00\x00\x04\x00" "\x7F\x00\x00\x00", 24);
 	}
