@@ -563,6 +563,19 @@ static void dump_wlan_info(unsigned wlanidx) {
 	unlock();
 }
 
+static void sanitize_string(char *s, char *new) {
+	size_t i,j, l = strlen(s), ls=l;
+	for(i=0,j=0;i<ls;i++) {
+		if(s[i] < ' ' || s[i] > 127) {
+			sprintf(new + j, "\\x%02x", s[i] & 0xff);
+			j  += 3;
+		} else new[j] = s[i];
+		j++;
+	}
+	new[j] = 0;
+}
+
+
 static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	console_goto(t, 0, line);
 	console_setcolor(t, 0, BGCOL);
@@ -588,9 +601,11 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 
 	char macbuf[18];
 
-	if(*w->essid)
-		console_printf(t, "%*s", ESSID_PRINT_LEN, w->essid);
-	else
+	if(*w->essid) {
+		char essid_san[32*4+1];
+		sanitize_string(w->essid, essid_san);
+		console_printf(t, "%*s", ESSID_PRINT_LEN, essid_san);
+	} else
 		console_printf(t, "<hidden> %*s", ESSID_PRINT_LEN-9, mac2str(w->mac, macbuf));
 
 	console_goto(t, ESSID_PRINT_END +1, line);
