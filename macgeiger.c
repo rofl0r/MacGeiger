@@ -126,107 +126,14 @@ void sigh(int x) {
 	stop = 1;
 }
 
-struct ieee80211_radiotap_header {
-	uint8_t it_version;
-	uint8_t it_pad;
-	uint16_t it_len;
-	uint32_t it_present;
-};
-
-enum ieee80211_radiotap_type {
-	IEEE80211_RADIOTAP_TSFT = 0,
-	IEEE80211_RADIOTAP_FLAGS = 1,
-	IEEE80211_RADIOTAP_RATE = 2,
-	IEEE80211_RADIOTAP_CHANNEL = 3,
-	IEEE80211_RADIOTAP_FHSS = 4,
-	IEEE80211_RADIOTAP_DBM_ANTSIGNAL = 5,
-	IEEE80211_RADIOTAP_DBM_ANTNOISE = 6,
-	IEEE80211_RADIOTAP_LOCK_QUALITY = 7,
-	IEEE80211_RADIOTAP_TX_ATTENUATION = 8,
-	IEEE80211_RADIOTAP_DB_TX_ATTENUATION = 9,
-	IEEE80211_RADIOTAP_DBM_TX_POWER = 10,
-	IEEE80211_RADIOTAP_ANTENNA = 11,
-	IEEE80211_RADIOTAP_DB_ANTSIGNAL = 12,
-	IEEE80211_RADIOTAP_DB_ANTNOISE = 13,
-	IEEE80211_RADIOTAP_RX_FLAGS = 14,
-	IEEE80211_RADIOTAP_TX_FLAGS = 15,
-	IEEE80211_RADIOTAP_RTS_RETRIES = 16,
-	IEEE80211_RADIOTAP_DATA_RETRIES = 17,
-	IEEE80211_RADIOTAP_XCHANNEL = 18,
-	IEEE80211_RADIOTAP_MCS = 19,
-	IEEE80211_RADIOTAP_AMPDU_STATUS = 20,
-	IEEE80211_RADIOTAP_VHT = 21,
-	IEEE80211_RADIOTAP_TIMESTAMP = 22,
-	IEEE80211_RADIOTAP_RADIOTAP_NAMESPACE = 29,
-	IEEE80211_RADIOTAP_VENDOR_NAMESPACE = 30,
-	IEEE80211_RADIOTAP_EXT = 31
-};
-
-static const unsigned char ieee80211_radiotap_type_size[] = {
-	[IEEE80211_RADIOTAP_TSFT] = 8,
-	[IEEE80211_RADIOTAP_FLAGS] = 1,
-	[IEEE80211_RADIOTAP_RATE] = 1,
-	[IEEE80211_RADIOTAP_CHANNEL] = 2*2,
-	[IEEE80211_RADIOTAP_FHSS] = 2,
-	[IEEE80211_RADIOTAP_DBM_ANTSIGNAL] = 1,
-	[IEEE80211_RADIOTAP_DBM_ANTNOISE] = 1,
-	[IEEE80211_RADIOTAP_LOCK_QUALITY] = 2,
-	[IEEE80211_RADIOTAP_TX_ATTENUATION] = 2,
-	[IEEE80211_RADIOTAP_DB_TX_ATTENUATION] = 2,
-	[IEEE80211_RADIOTAP_DBM_TX_POWER] = 1,
-	[IEEE80211_RADIOTAP_ANTENNA] = 1,
-	[IEEE80211_RADIOTAP_DB_ANTSIGNAL] = 1,
-	[IEEE80211_RADIOTAP_DB_ANTNOISE] = 1,
-	[IEEE80211_RADIOTAP_RX_FLAGS] = 2,
-	[IEEE80211_RADIOTAP_TX_FLAGS] = 2,
-	[IEEE80211_RADIOTAP_RTS_RETRIES] = 1,
-	[IEEE80211_RADIOTAP_DATA_RETRIES] = 1,
-	[IEEE80211_RADIOTAP_MCS] = 1+1+1,
-	[IEEE80211_RADIOTAP_AMPDU_STATUS] = 4+2+1+1,
-	[IEEE80211_RADIOTAP_VHT] = 12,
-	[IEEE80211_RADIOTAP_TIMESTAMP] = 12,
-};
-
-static const unsigned char ieee80211_radiotap_type_align[] = {
-	[IEEE80211_RADIOTAP_TSFT] = 8,
-	[IEEE80211_RADIOTAP_FLAGS] = 1,
-	[IEEE80211_RADIOTAP_RATE] = 1,
-	[IEEE80211_RADIOTAP_CHANNEL] = 2,
-	[IEEE80211_RADIOTAP_FHSS] = 2,
-	[IEEE80211_RADIOTAP_DBM_ANTSIGNAL] = 1,
-	[IEEE80211_RADIOTAP_DBM_ANTNOISE] = 1,
-	[IEEE80211_RADIOTAP_LOCK_QUALITY] = 2,
-	[IEEE80211_RADIOTAP_TX_ATTENUATION] = 2,
-	[IEEE80211_RADIOTAP_DB_TX_ATTENUATION] = 2,
-	[IEEE80211_RADIOTAP_DBM_TX_POWER] = 1,
-	[IEEE80211_RADIOTAP_ANTENNA] = 1,
-	[IEEE80211_RADIOTAP_DB_ANTSIGNAL] = 1,
-	[IEEE80211_RADIOTAP_DB_ANTNOISE] = 1,
-	[IEEE80211_RADIOTAP_RX_FLAGS] = 2,
-	[IEEE80211_RADIOTAP_TX_FLAGS] = 2,
-	[IEEE80211_RADIOTAP_RTS_RETRIES] = 1,
-	[IEEE80211_RADIOTAP_DATA_RETRIES] = 1,
-	[IEEE80211_RADIOTAP_MCS] = 1,
-	[IEEE80211_RADIOTAP_AMPDU_STATUS] = 4,
-	[IEEE80211_RADIOTAP_VHT] = 2,
-	[IEEE80211_RADIOTAP_TIMESTAMP] = 8,
-};
-
-static unsigned get_flag_off(unsigned flags, unsigned which, unsigned start_off) {
-	unsigned i,c=start_off;
-	for(i=0;i<which;i++) if(flags & (1U << i)) {
-		c+= c & (ieee80211_radiotap_type_align[i]-1);
-		c+= ieee80211_radiotap_type_size[i];
-	}
-	return c;
-}
+#include "radiotap_flags.h"
 
 static unsigned get_dbm_off(unsigned flags, unsigned start_off) {
-	return get_flag_off(flags, IEEE80211_RADIOTAP_DBM_ANTSIGNAL, start_off);
+	return rt_get_flag_offset(flags, IEEE80211_RADIOTAP_DBM_ANTSIGNAL, start_off);
 }
 
 static unsigned get_chan_off(unsigned flags, unsigned start_off) {
-	return get_flag_off(flags, IEEE80211_RADIOTAP_CHANNEL, start_off);
+	return rt_get_flag_offset(flags, IEEE80211_RADIOTAP_CHANNEL, start_off);
 }
 
 static unsigned channel_from_freq(unsigned freq) {
@@ -373,15 +280,14 @@ static int process_frame(pcap_t *foo) {
 	const unsigned char* data = pcap_next_wrapper(foo, &h);
 	if(data) {
 		if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
+
+		uint32_t flags, offset;
+		if(!rt_get_presentflags(data, h.len, &flags, &offset))
+			return -1;
+
 		struct ieee80211_radiotap_header *rh = (void*) data;
-		//size_t next_chunk = sizeof(*rh);
-		uint32_t flags = rh->it_present, flags_copy = flags;
-		unsigned ext_bytes = 0;
-		while(flags_copy & (1U << IEEE80211_RADIOTAP_EXT)) {
-			memcpy(&flags_copy, data+sizeof(*rh)+ext_bytes, 4);
-			ext_bytes += 4;
-		}
-		unsigned rtap_data = sizeof(*rh) + ext_bytes;
+
+		unsigned rtap_data = offset;
 
 		struct wlaninfo temp = {0};
 		{
