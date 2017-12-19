@@ -69,6 +69,7 @@ static struct wlaninfo {
 	unsigned char channel;
 	long long total_rssi;
 	long long last_seen;
+	uint64_t timestamp;
 	unsigned long count;
 	int last_rssi;
 } wlans[128];
@@ -116,6 +117,7 @@ static int set_rssi(struct wlaninfo *w) {
 		d->count++;
 		d->last_rssi = w->last_rssi;
 		d->channel = w->channel;
+		d->timestamp = w->timestamp;
 	}
 	unlock();
 	return i;
@@ -317,6 +319,8 @@ static int process_frame(pcap_t *foo) {
 			case 0x8000: /*beacon */
 				beacon = (void*)(data+rh->it_len);
 				memcpy(&temp.mac,beacon->source,6);
+				memcpy(&temp.timestamp,data+rh->it_len+sizeof(struct beaconframe),8);
+				temp.timestamp = end_le64toh(temp.timestamp);
 				pos = rh->it_len+sizeof(*beacon)+12;
 				tagdata = data+pos;
 				curr_tag = find_tag(tagdata, 0, h.len-pos); /* find essid tag */
@@ -441,6 +445,23 @@ char *mac2str(unsigned char mac[static 6], char buf[static 18]) {
 	return buf;
 }
 
+static void format_timestamp(uint64_t timestamp, char *ts) {
+#define TSTP_SEC 1000000ULL /* 1 MHz clock -> 1 million ticks/sec */
+#define TSTP_MIN (TSTP_SEC * 60ULL)
+#define TSTP_HOUR (TSTP_MIN * 60ULL)
+#define TSTP_DAY (TSTP_HOUR * 24ULL)
+	uint64_t rem;
+	unsigned days, hours, mins, secs;
+	days = timestamp / TSTP_DAY;
+	rem = timestamp % TSTP_DAY;
+	hours = rem / TSTP_HOUR;
+	rem %= TSTP_HOUR;
+	mins = rem / TSTP_MIN;
+	rem %= TSTP_MIN;
+	secs = rem / TSTP_SEC;
+	sprintf(ts, "%ud %02u:%02u:%02u", days, hours, mins, secs);
+}
+
 #define ESSID_PRINT_START 1
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
@@ -466,6 +487,14 @@ static void dump_wlan_info(unsigned wlanidx) {
 
 	console_goto(t, ESSID_PRINT_END +1+25, line);
 	console_printf(t, "CURR %d dBm", w->last_rssi);
+
+	line++;
+
+	console_goto(t, ESSID_PRINT_END +1, line);
+	char ts[64];
+	format_timestamp(w->timestamp, ts);
+	console_printf(t, "UP: %s", ts);
+
 	unlock();
 }
 
