@@ -64,14 +64,16 @@ static int usage(const char *argv0) {
 }
 
 static struct wlaninfo {
-	char essid[32];
-	unsigned char mac[6];
-	unsigned char channel;
 	long long total_rssi;
 	long long last_seen;
 	uint64_t timestamp;
 	unsigned long count;
-	int last_rssi;
+	char essid[32];
+	unsigned char mac[6];
+	unsigned char channel;
+	signed char last_rssi;
+	signed char min_rssi;
+	signed char max_rssi;
 } wlans[128];
 static unsigned wlan_count;
 
@@ -98,8 +100,11 @@ static int get_wlan_by_mac(unsigned char mac[6]) {
 }
 
 static int get_new_wlan(void) {
-	if(wlan_count+1<sizeof(wlans)/sizeof(wlans[0]))
+	if(wlan_count+1<sizeof(wlans)/sizeof(wlans[0])) {
+		wlans[wlan_count].min_rssi = 127;
+		wlans[wlan_count].max_rssi = -127;
 		return wlan_count++;
+	}
 	return -1;
 }
 
@@ -118,6 +123,8 @@ static int set_rssi(struct wlaninfo *w) {
 		d->last_rssi = w->last_rssi;
 		d->channel = w->channel;
 		d->timestamp = w->timestamp;
+		d->min_rssi = MIN(d->min_rssi, d->last_rssi);
+		d->max_rssi = MAX(d->max_rssi, d->last_rssi);
 	}
 	unlock();
 	return i;
@@ -469,31 +476,50 @@ static void format_timestamp(uint64_t timestamp, char *ts) {
 static void dump_wlan_info(unsigned wlanidx) {
 	struct wlaninfo *w = &wlans[wlanidx];
 	lock();
-	unsigned line = 3;
+	unsigned line = 3, x, col1, col2, col3, col4;
 	console_setcolor(t, 0, BGCOL);
 	console_setcolor(t, 1, RGB(0xff,0xff,0xff));
 
-	console_goto(t, ESSID_PRINT_END +1, line);
+	col1 = x = 2;
+	console_goto(t, ++x, line);
 	char macbuf[18];
 	console_printf(t, "MAC %s", mac2str(w->mac, macbuf));
+	x += 25;
+	col2 = x;
 
-	console_goto(t, ESSID_PRINT_END +1+25, line);
+	console_goto(t, ++x, line);
 	console_printf(t, "CHAN %d", (int) w->channel);
+	x += 9 + 5;
+	col3 = x;
 
-	line++;
-
-	console_goto(t, ESSID_PRINT_END +1, line);
-	console_printf(t, "AVG %.2f dBm", (double)w->total_rssi/(double)w->count);
-
-	console_goto(t, ESSID_PRINT_END +1+25, line);
-	console_printf(t, "CURR %d dBm", w->last_rssi);
-
-	line++;
-
-	console_goto(t, ESSID_PRINT_END +1, line);
+	console_goto(t, ++x, line);
 	char ts[64];
 	format_timestamp(w->timestamp, ts);
 	console_printf(t, "UP: %s", ts);
+	x += strlen(ts) +5;
+	col4 = x;
+
+	line++;
+	x = col1;
+
+	console_goto(t, ++x, line);
+	console_printf(t, "AVG %.2f dBm", (double)w->total_rssi/(double)w->count);
+	//x += 14 + 5;
+	x = col2;
+
+	console_goto(t, ++x, line);
+	console_printf(t, "CURR %d dBm", w->last_rssi);
+	//x += 10 + 5;
+	x = col3;
+
+	console_goto(t, ++x, line);
+	console_printf(t, "MIN %d dBm", w->min_rssi);
+	//x += 9 + 5;
+	x = col4;
+
+	console_goto(t, ++x, line);
+	console_printf(t, "MAX %d dBm", w->max_rssi);
+	x += 9 + 5;
 
 	unlock();
 }
