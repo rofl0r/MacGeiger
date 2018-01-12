@@ -63,6 +63,13 @@ static int usage(const char *argv0) {
 	return 1;
 }
 
+enum enctype {
+	ET_OPEN = 0,
+	ET_WEP,
+	ET_WPA,
+	ET_WPA2,
+};
+
 static struct wlaninfo {
 	long long total_rssi;
 	long long last_seen;
@@ -75,6 +82,7 @@ static struct wlaninfo {
 	signed char last_rssi;
 	signed char min_rssi;
 	signed char max_rssi;
+	char enctype;
 } wlans[128];
 static unsigned wlan_count;
 
@@ -127,6 +135,7 @@ static int set_rssi(struct wlaninfo *w) {
 		d->beaconinterval = w->beaconinterval;
 		d->min_rssi = MIN(d->min_rssi, d->last_rssi);
 		d->max_rssi = MAX(d->max_rssi, d->last_rssi);
+		d->enctype = w->enctype;
 	}
 	unlock();
 	return i;
@@ -286,6 +295,12 @@ void setminmax(int val) {
 	console_settitle(t, mmbuf);
 }
 
+static int get_next_ie(const unsigned char *data, size_t len, size_t *currpos) {
+	if(*currpos + 2 >= len) return 0;
+	*currpos = *currpos + 2 + data[*currpos + 1];
+	return 1;
+}
+
 static int process_frame(pcap_t *foo) {
 	struct pcap_pkthdr h;
 	const unsigned char* data = pcap_next_wrapper(foo, &h);
@@ -318,6 +333,8 @@ static int process_frame(pcap_t *foo) {
 		struct beaconframe* beacon;
 		unsigned const char* tagdata, *curr_tag;
 		unsigned pos;
+		uint16_t caps;
+		size_t ie_iterator, tagdata_len;
 		switch(htons(framectl)) {
 			/* IEEE 802.11 packet type */
 			case 0xd400: /*ack*/
@@ -335,10 +352,16 @@ static int process_frame(pcap_t *foo) {
 				offset += 8;
 				memcpy(&temp.beaconinterval, data+offset,2);
 				temp.beaconinterval = end_le16toh(temp.beaconinterval);
-				offset += 4;
-				pos = rh->it_len+sizeof(*beacon)+12;
+				offset += 2;
+				memcpy(&caps, data+offset, 2);
+				caps = end_le16toh(caps);
+				if(caps & 0x10 /* CAPABILITY_WEP */)
+					temp.enctype = ET_WEP;
+				offset += 2;
+				pos = offset;
 				tagdata = data+pos;
-				curr_tag = find_tag(tagdata, 0, h.len-pos); /* find essid tag */
+				tagdata_len = h.len-pos;
+				curr_tag = find_tag(tagdata, 0, tagdata_len); /* find essid tag */
 				if(curr_tag) {
 					memcpy(temp.essid, curr_tag+2, curr_tag[1]);
 					temp.essid[curr_tag[1]] = 0;
@@ -347,12 +370,28 @@ static int process_frame(pcap_t *foo) {
 					dprintf(2, "XXX\n");
 					if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
 				}
-				curr_tag = find_tag(tagdata, 3, h.len-pos); /* find channel nr tag */
+				curr_tag = find_tag(tagdata, 3, tagdata_len); /* find channel nr tag */
 				if(curr_tag) {
 					assert(curr_tag[1] == 1);
 					temp.channel = curr_tag[2];
 				}
 				setminmax(temp.last_rssi);
+				curr_tag = find_tag(tagdata, 0x30 /* RSN_TAG_NUMBER */, tagdata_len);
+				if(curr_tag) {
+					temp.enctype = ET_WPA2;
+				}
+				/* iterate through vendor specific tags */
+				ie_iterator = 0;
+				do {
+					curr_tag = tagdata + ie_iterator;
+					if(curr_tag[0] == 0xDD /* VENDOR_SPECIFIC_TAG*/) {
+						if(curr_tag[1] >= 8 &&
+						   tagdata_len-ie_iterator >= 8 &&
+						   !memcmp(curr_tag+2, "\x00\x50\xF2\x01\x01\x00", 6))
+							temp.enctype = ET_WPA;
+					}
+
+				} while(get_next_ie(tagdata, tagdata_len, &ie_iterator));
 
 				return set_rssi(&temp);
 
@@ -477,6 +516,16 @@ static void format_timestamp(uint64_t timestamp, char *ts) {
 	sprintf(ts, "%ud %02u:%02u:%02u", days, hours, mins, secs);
 }
 
+static const char* enctype_str(enum enctype et) {
+	switch(et) {
+		case ET_OPEN: return "OPEN";
+		case ET_WEP : return "WEP ";
+		case ET_WPA : return "WPA ";
+		case ET_WPA2: return "WPA2";
+		default: abort();
+	}
+}
+
 #define ESSID_PRINT_START 1
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
@@ -531,6 +580,11 @@ static void dump_wlan_info(unsigned wlanidx) {
 	console_goto(t, ++x, line);
 	console_printf(t, "MAX %d dBm", w->max_rssi);
 	x += 9 + 5;
+
+	line++;
+	x = col1;
+	console_goto(t, ++x, line);
+	console_printf(t, "%s", enctype_str(w->enctype));
 
 	unlock();
 }
