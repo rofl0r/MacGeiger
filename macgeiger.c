@@ -339,7 +339,8 @@ static int process_frame(pcap_t *foo) {
 		size_t ie_iterator, tagdata_len;
 		switch(framectl) {
 			/* IEEE 802.11 packet type */
-			case 0x0080: /*beacon */
+			case 0x0080: /* beacon */
+			case 0x0050: /* probe response */
 				beacon = (void*)(data+offset);
 				memcpy(&temp.mac,beacon->source,6);
 				offset += sizeof(struct beaconframe);
