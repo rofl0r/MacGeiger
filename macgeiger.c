@@ -301,6 +301,44 @@ static int get_next_ie(const unsigned char *data, size_t len, size_t *currpos) {
 	return 1;
 }
 
+static void process_tags(const unsigned char* tagdata, size_t tagdata_len, struct wlaninfo *temp) {
+	unsigned const char *curr_tag;
+	curr_tag = find_tag(tagdata, 0, tagdata_len); /* find essid tag */
+	if(curr_tag) {
+		memcpy(temp->essid, curr_tag+2, curr_tag[1]);
+		temp->essid[curr_tag[1]] = 0;
+	}
+	#if 0
+	else {
+		/* dubious beacon without essid */
+		dprintf(2, "XXX\n");
+		if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
+	}
+	#endif
+	curr_tag = find_tag(tagdata, 3, tagdata_len); /* find channel nr tag */
+	if(curr_tag) {
+		assert(curr_tag[1] == 1);
+		temp->channel = curr_tag[2];
+	}
+
+	curr_tag = find_tag(tagdata, 0x30 /* RSN_TAG_NUMBER */, tagdata_len);
+	if(curr_tag) {
+		temp->enctype = ET_WPA2;
+	}
+	/* iterate through vendor specific tags */
+	size_t ie_iterator = 0;
+	do {
+		curr_tag = tagdata + ie_iterator;
+		if(curr_tag[0] == 0xDD /* VENDOR_SPECIFIC_TAG*/) {
+			if(curr_tag[1] >= 8 &&
+			   tagdata_len-ie_iterator >= 8 &&
+			   !memcmp(curr_tag+2, "\x00\x50\xF2\x01\x01\x00", 6))
+				temp->enctype = ET_WPA;
+		}
+
+	} while(get_next_ie(tagdata, tagdata_len, &ie_iterator));
+}
+
 static int process_frame(pcap_t *foo) {
 	struct pcap_pkthdr h;
 	const unsigned char* data = pcap_next_wrapper(foo, &h);
@@ -333,10 +371,10 @@ static int process_frame(pcap_t *foo) {
 		memcpy(&framectl, data+offset, 2);
 		framectl = end_le16toh(framectl);
 		struct beaconframe* beacon;
-		unsigned const char* tagdata, *curr_tag;
+		unsigned const char* tagdata;
 		unsigned pos;
 		uint16_t caps;
-		size_t ie_iterator, tagdata_len;
+		size_t tagdata_len;
 		switch(framectl) {
 			/* IEEE 802.11 packet type */
 			case 0x0080: /* beacon */
@@ -358,38 +396,8 @@ static int process_frame(pcap_t *foo) {
 				pos = offset;
 				tagdata = data+pos;
 				tagdata_len = h.len-pos;
-				curr_tag = find_tag(tagdata, 0, tagdata_len); /* find essid tag */
-				if(curr_tag) {
-					memcpy(temp.essid, curr_tag+2, curr_tag[1]);
-					temp.essid[curr_tag[1]] = 0;
-				} else {
-					/* dubious beacon without essid */
-					dprintf(2, "XXX\n");
-					if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
-				}
-				curr_tag = find_tag(tagdata, 3, tagdata_len); /* find channel nr tag */
-				if(curr_tag) {
-					assert(curr_tag[1] == 1);
-					temp.channel = curr_tag[2];
-				}
+				process_tags(tagdata, tagdata_len, &temp);
 				setminmax(temp.last_rssi);
-				curr_tag = find_tag(tagdata, 0x30 /* RSN_TAG_NUMBER */, tagdata_len);
-				if(curr_tag) {
-					temp.enctype = ET_WPA2;
-				}
-				/* iterate through vendor specific tags */
-				ie_iterator = 0;
-				do {
-					curr_tag = tagdata + ie_iterator;
-					if(curr_tag[0] == 0xDD /* VENDOR_SPECIFIC_TAG*/) {
-						if(curr_tag[1] >= 8 &&
-						   tagdata_len-ie_iterator >= 8 &&
-						   !memcmp(curr_tag+2, "\x00\x50\xF2\x01\x01\x00", 6))
-							temp.enctype = ET_WPA;
-					}
-
-				} while(get_next_ie(tagdata, tagdata_len, &ie_iterator));
-
 				return set_rssi(&temp);
 
 				break;
