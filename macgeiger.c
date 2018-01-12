@@ -68,6 +68,7 @@ static struct wlaninfo {
 	long long last_seen;
 	uint64_t timestamp;
 	unsigned long count;
+	uint16_t beaconinterval;
 	char essid[32];
 	unsigned char mac[6];
 	unsigned char channel;
@@ -123,6 +124,7 @@ static int set_rssi(struct wlaninfo *w) {
 		d->last_rssi = w->last_rssi;
 		d->channel = w->channel;
 		d->timestamp = w->timestamp;
+		d->beaconinterval = w->beaconinterval;
 		d->min_rssi = MIN(d->min_rssi, d->last_rssi);
 		d->max_rssi = MAX(d->max_rssi, d->last_rssi);
 	}
@@ -324,10 +326,16 @@ static int process_frame(pcap_t *foo) {
 				//break;
 				return -1;
 			case 0x8000: /*beacon */
-				beacon = (void*)(data+rh->it_len);
+				offset = rh->it_len;
+				beacon = (void*)(data+offset);
 				memcpy(&temp.mac,beacon->source,6);
-				memcpy(&temp.timestamp,data+rh->it_len+sizeof(struct beaconframe),8);
+				offset += sizeof(struct beaconframe);
+				memcpy(&temp.timestamp,data+offset,8);
 				temp.timestamp = end_le64toh(temp.timestamp);
+				offset += 8;
+				memcpy(&temp.beaconinterval, data+offset,2);
+				temp.beaconinterval = end_le16toh(temp.beaconinterval);
+				offset += 4;
 				pos = rh->it_len+sizeof(*beacon)+12;
 				tagdata = data+pos;
 				curr_tag = find_tag(tagdata, 0, h.len-pos); /* find essid tag */
@@ -498,6 +506,9 @@ static void dump_wlan_info(unsigned wlanidx) {
 	console_printf(t, "UP: %s", ts);
 	x += strlen(ts) +5;
 	col4 = x;
+
+	console_goto(t, ++x, line);
+	console_printf(t, "BI %d ms", (int) w->beaconinterval);
 
 	line++;
 	x = col1;
