@@ -302,11 +302,11 @@ static int get_next_ie(const unsigned char *data, size_t len, size_t *currpos) {
 }
 
 static void process_tags(const unsigned char* tagdata, size_t tagdata_len, struct wlaninfo *temp) {
-	unsigned const char *curr_tag;
-	curr_tag = find_tag(tagdata, 0, tagdata_len); /* find essid tag */
-	if(curr_tag) {
-		memcpy(temp->essid, curr_tag+2, curr_tag[1]);
-		temp->essid[curr_tag[1]] = 0;
+	unsigned const char *tag;
+	tag = find_tag(tagdata, 0, tagdata_len); /* find essid tag */
+	if(tag) {
+		memcpy(temp->essid, tag+2, tag[1]);
+		temp->essid[tag[1]] = 0;
 	}
 	#if 0
 	else {
@@ -315,24 +315,24 @@ static void process_tags(const unsigned char* tagdata, size_t tagdata_len, struc
 		if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
 	}
 	#endif
-	curr_tag = find_tag(tagdata, 3, tagdata_len); /* find channel nr tag */
-	if(curr_tag) {
-		assert(curr_tag[1] == 1);
-		temp->channel = curr_tag[2];
+	tag = find_tag(tagdata, 3, tagdata_len); /* find channel nr tag */
+	if(tag) {
+		assert(tag[1] == 1);
+		temp->channel = tag[2];
 	}
 
-	curr_tag = find_tag(tagdata, 0x30 /* RSN_TAG_NUMBER */, tagdata_len);
-	if(curr_tag) {
+	tag = find_tag(tagdata, 0x30 /* RSN_TAG_NUMBER */, tagdata_len);
+	if(tag) {
 		temp->enctype = ET_WPA2;
 	}
 	/* iterate through vendor specific tags */
 	size_t ie_iterator = 0;
 	do {
-		curr_tag = tagdata + ie_iterator;
-		if(curr_tag[0] == 0xDD /* VENDOR_SPECIFIC_TAG*/) {
-			if(curr_tag[1] >= 8 &&
+		tag = tagdata + ie_iterator;
+		if(tag[0] == 0xDD /* VENDOR_SPECIFIC_TAG*/) {
+			if(tag[1] >= 8 &&
 			   tagdata_len-ie_iterator >= 8 &&
-			   !memcmp(curr_tag+2, "\x00\x50\xF2\x01\x01\x00", 6))
+			   !memcmp(tag+2, "\x00\x50\xF2\x01\x01\x00", 6))
 				temp->enctype = ET_WPA;
 		}
 
