@@ -329,21 +329,17 @@ static int process_frame(pcap_t *foo) {
 			temp.channel = channel_from_freq(freq);
 		}
 		uint16_t framectl;
-		memcpy(&framectl, data+rh->it_len, 2);
+		offset = rh->it_len;
+		memcpy(&framectl, data+offset, 2);
+		framectl = end_le16toh(framectl);
 		struct beaconframe* beacon;
 		unsigned const char* tagdata, *curr_tag;
 		unsigned pos;
 		uint16_t caps;
 		size_t ie_iterator, tagdata_len;
-		switch(htons(framectl)) {
+		switch(framectl) {
 			/* IEEE 802.11 packet type */
-			case 0xd400: /*ack*/
-				//memcpy(&temp.mac,data+rh->it_len+4, 6);
-				//set_rssi(&temp, dbm);
-				//break;
-				return -1;
-			case 0x8000: /*beacon */
-				offset = rh->it_len;
+			case 0x0080: /*beacon */
 				beacon = (void*)(data+offset);
 				memcpy(&temp.mac,beacon->source,6);
 				offset += sizeof(struct beaconframe);
@@ -396,8 +392,9 @@ static int process_frame(pcap_t *foo) {
 				return set_rssi(&temp);
 
 				break;
-			case 0x8842: /*QOS */
-			case 0x4000: /* probe request */
+			case 0x00d4: /*ack*/
+			case 0x4288: /*QOS */
+			case 0x0040: /* probe request */
 			default:
 				return -1;
 		}
