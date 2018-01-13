@@ -1,3 +1,4 @@
+
 /*
     MacGeiger WIFI AP detector
     Copyright (C) 2014 rofl0r
@@ -135,6 +136,7 @@ static pthread_mutex_t wlan_lock = PTHREAD_MUTEX_INITIALIZER;
 static signed char min, max;
 static unsigned char selection, selected;
 static Console co, *t = &co;
+static int colorcount;
 
 static int get_wlan_by_essid(char* essid) {
 	unsigned i;
@@ -619,6 +621,10 @@ static int next_chan(int chan) {
 static struct {int w, h;} dim;
 
 #define BGCOL RGB(33, 66, 133)
+#define COL_BLACK RGB(0,0,0)
+#define COL_WHITE RGB(255,255,255)
+#define COL_YELLOW RGB(255,255,0)
+
 static void draw_bg() {
 	unsigned x, y;
 	console_setcolor(t, 0, BGCOL);
@@ -638,14 +644,25 @@ static void dump_wlan(unsigned idx) {
 	            (double)w->total_rssi/(double)w->count, w->last_rssi);
 }
 #else
+static unsigned reduce_color(unsigned val) {
+	unsigned a = val;
+	if (colorcount <= 8) {
+		a /= 85;
+		if(a > 2) a = 2;
+		static const unsigned tbl[] = {0, 127, 255};
+		a = tbl[a];
+	}
+	return a;
+
+}
 static int get_r(unsigned percent) {
-	return (50 - percent/2) * 5;
+	return reduce_color((50 - percent/2) * 5);
 }
 static int get_g(unsigned percent) {
-	return percent/2 * 5;
+	return reduce_color(percent/2 * 5);
 }
 static int get_a(unsigned age) {
-	return 5+((50 - age)*5);
+	return reduce_color(5+((50 - age)*5));
 }
 #define LINES_PER_NET 1
 static void selection_move(int dir) {
@@ -711,7 +728,7 @@ static void dump_wlan_info(unsigned wlanidx) {
 	lock();
 	unsigned line = 3, x, col1, col2, col3, col4;
 	console_setcolor(t, 0, BGCOL);
-	console_setcolor(t, 1, RGB(0xff,0xff,0xff));
+	console_setcolor(t, 1, COL_WHITE);
 
 	col1 = x = 2;
 	console_goto(t, ++x, line);
@@ -812,7 +829,8 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	console_goto(t, 0, line);
 	console_setcolor(t, 0, BGCOL);
 
-	console_setcolor(t, 1, RGB(255,255,0));
+	console_setcolor(t, 1, COL_YELLOW);
+
 	if(wlanidx == selection) {
 		console_printchar(t, '>', 0);
 	} else {
@@ -861,8 +879,8 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 		if(wlanidx == selection) step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
 		else step_color = RGB(get_r(x/widthpercent),get_r(x/widthpercent),get_r(x/widthpercent));
 		console_setcolor(t, 0, step_color);
-		if(x != curr_marker) console_setcolor(t, 1, RGB(0,0,0));
-		else console_setcolor(t, 1, RGB(255,255,255));
+		if(x != curr_marker) console_setcolor(t, 1, COL_BLACK);
+		else console_setcolor(t, 1, COL_WHITE);
 		if(x == avg_marker) console_printchar(t, 'I', 0);
 		else if (x == curr_marker) console_printchar(t, '|', 0);
 		else if(x == 0) console_printchar(t, '[', 0);
@@ -920,9 +938,10 @@ static void initconcol() {
 	point reso = {rw, rh};
 	console_init_graphics(&co, reso, FONT);
         console_getbounds(t, &dim.w, &dim.h);
+	colorcount = console_getcolorcount(t);
 #ifdef NO_COLOR
-	(*console_setcolor)(t, 0, RGB(255,255,255));
-	(*console_setcolor)(t, 1, RGB(0,0,0));
+	(*console_setcolor)(t, 0, COL_WHITE);
+	(*console_setcolor)(t, 1, COL_BLACK);
 #endif
 	draw_bg();
 }
