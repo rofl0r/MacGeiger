@@ -63,6 +63,47 @@ static int usage(const char *argv0) {
 	return 1;
 }
 
+/* originally 256, but that would make the struct too big for the stack */
+#define WPS_MAX_STR_LEN 64
+struct wps_data
+{
+	uint8_t version;
+	uint8_t state;
+	uint8_t locked;
+	char manufacturer[WPS_MAX_STR_LEN];
+	char model_name[WPS_MAX_STR_LEN];
+	char model_number[WPS_MAX_STR_LEN];
+	char device_name[WPS_MAX_STR_LEN];
+	char ssid[WPS_MAX_STR_LEN];
+	char uuid[WPS_MAX_STR_LEN];
+	char serial[WPS_MAX_STR_LEN];
+	char selected_registrar[WPS_MAX_STR_LEN];
+	char response_type[WPS_MAX_STR_LEN];
+	char primary_device_type[WPS_MAX_STR_LEN];
+	char config_methods[WPS_MAX_STR_LEN];
+	char rf_bands[WPS_MAX_STR_LEN];
+	char os_version[WPS_MAX_STR_LEN];
+};
+
+static void init_wps_data(struct wps_data* wps) {
+	wps->version = 0;
+	wps->state = 0;
+	wps->locked = 0;
+	wps->manufacturer[0] = 0;
+	wps->model_name[0] = 0;
+	wps->model_number[0] = 0;
+	wps->device_name[0] = 0;
+	wps->ssid[0] = 0;
+	wps->uuid[0] = 0;
+	wps->serial[0] = 0;
+	wps->selected_registrar[0] = 0;
+	wps->response_type[0] = 0;
+	wps->primary_device_type[0] = 0;
+	wps->config_methods[0] = 0;
+	wps->rf_bands[0] = 0;
+	wps->os_version[0] = 0;
+}
+
 enum enctype {
 	ET_OPEN = 0,
 	ET_WEP,
@@ -71,6 +112,7 @@ enum enctype {
 };
 
 static struct wlaninfo {
+	struct wps_data *wps;
 	long long total_rssi;
 	long long last_seen;
 	uint64_t timestamp;
@@ -117,7 +159,7 @@ static int get_new_wlan(void) {
 	return -1;
 }
 
-static int set_rssi(struct wlaninfo *w) {
+static int set_rssi(struct wlaninfo *w, struct wps_data* wps) {
 	int i = -1;
 //	if(w->essid[0]) i = get_wlan_by_essid(w->essid);
 	lock();
@@ -136,6 +178,20 @@ static int set_rssi(struct wlaninfo *w) {
 		d->min_rssi = MIN(d->min_rssi, d->last_rssi);
 		d->max_rssi = MAX(d->max_rssi, d->last_rssi);
 		d->enctype = w->enctype;
+		if(wps->version) {
+			if(!d->wps) {
+				d->wps = malloc(sizeof *wps);
+				if(d->wps) init_wps_data(d->wps);
+			}
+			if(d->wps) {
+				if(!wps->manufacturer[0]) {
+					d->wps->version = wps->version;
+					d->wps->state = wps->state;
+					d->wps->locked = wps->locked;
+				} else
+					memcpy(d->wps, wps, sizeof(*wps));
+			}
+		}
 	}
 	unlock();
 	return i;
@@ -302,7 +358,120 @@ static int get_next_ie(const unsigned char *data, size_t len, size_t *currpos) {
 	return 1;
 }
 
-static void process_tags(const unsigned char* tagdata, size_t tagdata_len, struct wlaninfo *temp) {
+static int get_next_wps_el(const unsigned char *data, size_t len, size_t *currpos) {
+	if(*currpos + 4 >= len) return 0;
+	uint16_t el_len;
+	memcpy(&el_len, data + 2 + *currpos, 2);
+	el_len = end_be16toh(el_len);
+	*currpos = *currpos + 4 + el_len;
+	if(*currpos >= len) return 0;
+	return 1;
+}
+
+static void process_wps_tag(const unsigned char* tag, size_t len, struct wps_data *wps) {
+	unsigned const char *el;
+	char *str;
+	size_t el_iterator = 0, wfa_iterator, remain;
+	uint16_t el_id, el_len;
+	int hex;
+
+	do {
+		el = tag + el_iterator;
+		remain = len - el_iterator;
+		memcpy(&el_id, el, 2);
+		el_id = end_be16toh(el_id);
+		memcpy(&el_len, el+2, 2);
+		el_len = end_be16toh(el_len);
+		el += 4;
+		str = 0, hex = 0;
+		switch(el_id) {
+			case 0x104A: /* WPS_VERSION */
+				wps->version = *el;
+				break;
+			case 0x1044: /* WPS_STATE */
+				wps->state = *el;
+				break;
+			case 0x1057: /* WPS_LOCKED */
+				wps->locked = *el;
+				break;
+			case 0x1021: /* WPS_MANUFACTURER */
+				str = wps->manufacturer;
+				break;
+			case 0x1023: /*WPS_MODEL_NAME */
+				str = wps->model_name;
+				break;
+			case 0x1024:
+				str = wps->model_number;
+				break;
+			case 0x1011:
+				str = wps->device_name;
+				break;
+			case 0x1045:
+				str = wps->ssid;
+				break;
+			case 0x1047:
+				str = wps->uuid;
+				hex = 1;
+				break;
+			case 0x1042:
+				str = wps->serial;
+				break;
+			case 0x1041:
+				str = wps->selected_registrar;
+				hex = 1;
+				break;
+			case 0x103B:
+				str = wps->response_type;
+				hex = 1;
+				break;
+			case 0x1054:
+				str = wps->primary_device_type;
+				hex = 1;
+				break;
+			case 0x1008:
+				str = wps->config_methods;
+				hex = 1;
+				break;
+			case 0x103C:
+				str = wps->rf_bands;
+				hex = 1;
+			case 0x102D:
+				str = wps->os_version;
+				break;
+			case 0x1049: /* WPS_VENDOR_EXTENSION */
+				if(el_len >= 5 && !memcmp(el, "\x00\x37\x2A", 3)) { /* WFA_EXTENSION */
+					el_len -= 3;
+					el += 3;
+					wfa_iterator = 0;
+					do {
+						if(wfa_iterator+2 <= el_len && el[wfa_iterator] == 0 /* WPS_VERSION2_ID */) {
+							wps->version = el[2];
+						}
+					} while(get_next_ie(el, el_len, &wfa_iterator));
+				}
+				break;
+		}
+		if(str) {
+			size_t max;
+			if(hex) {
+				max = el_len >= WPS_MAX_STR_LEN/2 ? WPS_MAX_STR_LEN/2 - 1 : el_len;
+				while(max--) {
+					sprintf(str, "%02x", *el);
+					el++;
+					str += 2;
+				}
+				*str = 0;
+			} else {
+				max = el_len + 1 >= WPS_MAX_STR_LEN ? WPS_MAX_STR_LEN  : el_len + 1;
+				snprintf(str, max, "%s", el);
+			}
+		}
+
+	} while(get_next_wps_el(tag, len, &el_iterator));
+
+}
+
+static void process_tags(const unsigned char* tagdata, size_t tagdata_len, struct wlaninfo *temp, struct wps_data *wps) {
 	unsigned const char *tag;
 
 	/* iterate through tags */
@@ -325,10 +494,12 @@ static void process_tags(const unsigned char* tagdata, size_t tagdata_len, struc
 			temp->enctype = ET_WPA2;
 			break;
 		case 0xDD: /* VENDOR_SPECIFIC_TAG*/
+			if(tag[1] >= remain) break;
 			if(tag[1] >= 8 &&
-			   remain >= 8 &&
 			   !memcmp(tag+2, "\x00\x50\xF2\x01\x01\x00", 6))
 				temp->enctype = ET_WPA;
+			if(tag[1] > 4 && !memcmp(tag+2, "\x00\x50\xf2" /*micro$oft*/ "\x04" /*type WPS*/, 4))
+				process_wps_tag(tag+2+4, tag[1]-4, wps);
 			break;
 		}
 
@@ -371,6 +542,8 @@ static int process_frame(pcap_t *foo) {
 		unsigned pos;
 		uint16_t caps;
 		size_t tagdata_len;
+		struct wps_data wps;
+
 		switch(framectl) {
 			/* IEEE 802.11 packet type */
 			case 0x0080: /* beacon */
@@ -392,9 +565,10 @@ static int process_frame(pcap_t *foo) {
 				pos = offset;
 				tagdata = data+pos;
 				tagdata_len = h.len-pos;
-				process_tags(tagdata, tagdata_len, &temp);
+				init_wps_data(&wps);
+				process_tags(tagdata, tagdata_len, &temp, &wps);
 				setminmax(temp.last_rssi);
-				return set_rssi(&temp);
+				return set_rssi(&temp, &wps);
 
 				break;
 			case 0x00d4: /*ack*/
@@ -587,6 +761,36 @@ static void dump_wlan_info(unsigned wlanidx) {
 	x = col1;
 	console_goto(t, ++x, line);
 	console_printf(t, "%s", enctype_str(w->enctype));
+
+	x = col2;
+	console_goto(t, ++x, line);
+	if(w->wps) console_printf(t, "WPS %d.%d", w->wps->version >> 4, w->wps->version & 15);
+
+	x = col3;
+	console_goto(t, ++x, line);
+	if(w->wps) console_printf(t, w->wps->locked == 1 ? "LOCKED" : "-");
+
+	x = col4;
+	console_goto(t, ++x, line);
+	if(w->wps && w->wps->manufacturer[0]) console_printf(t, "%s", w->wps->manufacturer);
+
+	line++;
+
+	x = col1;
+	console_goto(t, ++x, line);
+	if(w->wps && w->wps->model_name[0]) console_printf(t, "%s", w->wps->model_name);
+
+	x = col2;
+	console_goto(t, ++x, line);
+	if(w->wps && w->wps->model_number[0]) console_printf(t, "%s", w->wps->model_number);
+
+	x = col3;
+	console_goto(t, ++x, line);
+	if(w->wps && w->wps->device_name[0]) console_printf(t, "%s", w->wps->device_name);
+
+	x = col4;
+	console_goto(t, ++x, line);
+	if(w->wps && w->wps->serial[0]) console_printf(t, "%s", w->wps->serial);
 
 	unlock();
 }
