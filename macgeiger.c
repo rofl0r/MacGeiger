@@ -719,6 +719,18 @@ static const char* enctype_str(enum enctype et) {
 	}
 }
 
+static void sanitize_string(char *s, char *new) {
+	size_t i,j, l = strlen(s), ls=l;
+	for(i=0,j=0;i<ls;i++) {
+		if(s[i] < ' ' || s[i] > 127) {
+			sprintf(new + j, "\\x%02x", s[i] & 0xff);
+			j  += 3;
+		} else new[j] = s[i];
+		j++;
+	}
+	new[j] = 0;
+}
+
 #define ESSID_PRINT_START 1
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
@@ -787,43 +799,47 @@ static void dump_wlan_info(unsigned wlanidx) {
 	console_goto(t, ++x, line);
 	if(w->wps) console_printf(t, w->wps->locked == 1 ? "LOCKED" : "-");
 
+	char sanbuf[WPS_MAX_STR_LEN*4+1];
+
 	x = col4;
 	console_goto(t, ++x, line);
-	if(w->wps && w->wps->manufacturer[0]) console_printf(t, "%s", w->wps->manufacturer);
+	if(w->wps && w->wps->manufacturer[0]) {
+		sanitize_string(w->wps->manufacturer, sanbuf);
+		console_printf(t, "%s", sanbuf);
+	}
 
 	line++;
 
 	x = col1;
 	console_goto(t, ++x, line);
-	if(w->wps && w->wps->model_name[0]) console_printf(t, "%s", w->wps->model_name);
+	if(w->wps && w->wps->model_name[0]) {
+		sanitize_string(w->wps->model_name, sanbuf);
+		console_printf(t, "%s", sanbuf);
+	}
 
 	x = col2;
 	console_goto(t, ++x, line);
-	if(w->wps && w->wps->model_number[0]) console_printf(t, "%s", w->wps->model_number);
+	if(w->wps && w->wps->model_number[0]) {
+		sanitize_string(w->wps->model_number, sanbuf);
+		console_printf(t, "%s", sanbuf);
+	}
 
 	x = col3;
 	console_goto(t, ++x, line);
-	if(w->wps && w->wps->device_name[0]) console_printf(t, "%s", w->wps->device_name);
+	if(w->wps && w->wps->device_name[0]) {
+		sanitize_string(w->wps->device_name, sanbuf);
+		console_printf(t, "%s", sanbuf);
+	}
 
 	x = col4;
 	console_goto(t, ++x, line);
-	if(w->wps && w->wps->serial[0]) console_printf(t, "%s", w->wps->serial);
+	if(w->wps && w->wps->serial[0]) {
+		sanitize_string(w->wps->serial, sanbuf);
+		console_printf(t, "%s", sanbuf);
+	}
 
 	unlock();
 }
-
-static void sanitize_string(char *s, char *new) {
-	size_t i,j, l = strlen(s), ls=l;
-	for(i=0,j=0;i<ls;i++) {
-		if(s[i] < ' ' || s[i] > 127) {
-			sprintf(new + j, "\\x%02x", s[i] & 0xff);
-			j  += 3;
-		} else new[j] = s[i];
-		j++;
-	}
-	new[j] = 0;
-}
-
 
 static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	console_goto(t, 0, line);
