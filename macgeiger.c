@@ -719,7 +719,7 @@ static const char* enctype_str(enum enctype et) {
 	}
 }
 
-static void sanitize_string(char *s, char *new) {
+static char* sanitize_string(char *s, char *new) {
 	size_t i,j, l = strlen(s), ls=l;
 	for(i=0,j=0;i<ls;i++) {
 		if(s[i] < ' ' || s[i] > 127) {
@@ -729,6 +729,7 @@ static void sanitize_string(char *s, char *new) {
 		j++;
 	}
 	new[j] = 0;
+	return new;
 }
 
 #define ESSID_PRINT_START 1
@@ -1092,8 +1093,31 @@ static void* capture_thread(void*arg) {
 	return 0;
 }
 
+static pthread_t bt, wt;
+static const char *itf;
+
+static void set_selection(int on) {
+	selected = on;
+	if(selected) {
+		pthread_join(wt, 0);
+		draw_bg();
+		pthread_create(&bt, 0, blip_thread, 0);
+		if(!filebased) set_channel(itf, wlans[selection].channel);
+	} else {
+		pthread_create(&wt, 0, chanwalker_thread, (void*)itf);
+		pthread_join(bt, 0);
+	}
+}
+
+
+//RcB: DEP "server.c"
+//RcB: DEP "../lib/src/sblist/*.c"
+//RcB: DEP "../lib/src/strlib/hexval.c"
+#include "netgui.c"
+
 int main(int argc,char**argv) {
 	if(argc == 1) return usage(argv[0]);
+	itf = argv[1];
 	min = 127;
 	max = -60;
 	outfd = -1;
@@ -1141,9 +1165,14 @@ int main(int argc,char**argv) {
 
 	int channel = 1;
 	long long tm = 0;
-	pthread_t bt, wt, ct;
+	pthread_t ct, nt;
 	pthread_create(&wt, 0, chanwalker_thread, argv[1]);
 	pthread_create(&ct, 0, capture_thread, foo);
+
+	struct netgui_config netgui_cfg;
+	if(getenv("NETGUI")) {
+		netgui_start(&netgui_cfg, "0.0.0.0", 9876);
+	}
 
 	while(!stop) {
 		long long tmp = getutime64();
@@ -1161,16 +1190,8 @@ int main(int argc,char**argv) {
 			case CK_CURSOR_DOWN: selection_move(1);break;
 			case CK_CURSOR_UP: selection_move(-1);break;
 			case CK_RETURN:
-				selected = !selected;
-				if(selected) {
-					pthread_join(wt, 0);
-					draw_bg();
-					pthread_create(&bt, 0, blip_thread, 0);
-					if(!filebased) set_channel(argv[1], wlans[selection].channel);
-				} else {
-					pthread_create(&wt, 0, chanwalker_thread, argv[1]);
-					pthread_join(bt, 0);
-				}
+				//selected = !selected;
+				set_selection(!selected);
 				break;
 			case CK_QUIT:
 			case CK_ESCAPE: stop = 1; break;
@@ -1179,6 +1200,10 @@ int main(int argc,char**argv) {
 	}
 
 	pcap_breakloop(foo); // this doesn't actually seem to work
+
+	if(getenv("NETGUI")) {
+		netgui_stop(&netgui_cfg);
+	}
 
 	if(selected) {
 		selected = 0;

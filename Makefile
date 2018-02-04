@@ -9,7 +9,7 @@ CFLAGS_OPT=-s -Os
 CFLAGS_RCB_OPT=${CFLAGS_OWN} ${CFLAGS_OPT} ${CFLAGS}
 CFLAGS_RCB_DBG=${CFLAGS_OWN} ${CFLAGS_DBG} ${CFLAGS}
 
-SRCS=$(FNAME).c audio-backend.c channel-switch.c
+SRCS=$(FNAME).c audio-backend.c channel-switch.c netgui.c
 
 all: $(FNAME).out
 
