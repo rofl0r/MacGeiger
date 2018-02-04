@@ -1,6 +1,6 @@
 body {
-  font-family: Helvetica Neue, Arial, sans-serif;
-  font-size: 14px;
+  font-family: Monospace;
+  font-size: 11px;
   color: #444;
 }
 
@@ -11,7 +11,7 @@ table {
 }
 
 th {
-  background-color: #442211;
+  background-color: #112244;
   color: rgba(255,255,255,0.66);
   cursor: pointer;
   -webkit-user-select: none;
@@ -20,13 +20,17 @@ th {
   user-select: none;
 }
 
+tr {
+	border: 1px solid #000000;
+}
+
 td {
-  background-color: #f9f9f9;
+  background-color: #d9d9d9;
 }
 
 th, td {
-  min-width: 120px;
-  padding: 10px 20px;
+  min-width: 20px;
+  padding: 5px 10px;
 }
 
 th.active {
