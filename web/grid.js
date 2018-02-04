@@ -4,6 +4,7 @@ Vue.component('demo-grid', {
   props: {
     data: Array,
     columns: Array,
+    headernames: Object,
     filterKey: String
   },
   data: function () {
@@ -57,10 +58,49 @@ var demo = new Vue({
 	el: '#demo',
 	data: {
 		searchQuery: '',
-		gridColumns: ['bssid', 'essid', 'channel', 'rssi', 'wps_version', 'wps_state', 'wps_manufacturer', 'wps_model_name', 'wps_model_number', 'wps_device_name', 'wps_serial', 'wps_uuid', 'wps_response_type', 'wps_primary_device_type', 'wps_config_methods'],
-		gridData: [
-			{ 'bssid': 0, 'essid': '', 'channel':0, 'rssi':0, 'wps_version':0, 'wps_state':0, 'wps_manufacturer':'', 'wps_model_name':'', 'wps_model_number':'', 'wps_device_name':'', 'wps_serial':'', 'wps_uuid':'', 'wps_response_type':'', 'wps_primary_device_type': '', 'wps_config_methods':'' }
+		gridColumns: [
+			'bssid',
+			'essid',
+			'channel',
+			'rssi',
+			'wps_version',
+			//'wps_state',
+			'wps_locked',
+			'wps_manufacturer',
+			'wps_model_name',
+			'wps_model_number',
+			'wps_device_name',
+			'wps_serial'
+			/*
+			'wps_uuid',
+			'wps_response_type',
+			'wps_primary_device_type',
+			'wps_config_methods'
+			*/
 		],
+		gridData: [
+			{
+				'bssid': 0, 'essid': '', 'channel':0, 'rssi':0, 'wps_version':0,
+				'wps_locked':0, 'wps_state':0,
+				'wps_manufacturer':'', 'wps_model_name':'', 'wps_model_number':'',
+				'wps_device_name':'', 'wps_serial':'', 'wps_uuid':'',
+				'wps_response_type':'', 'wps_primary_device_type': '',
+				'wps_config_methods':''
+			}
+		],
+		gridHeaders: {
+			'bssid':'bssid',
+			'essid':'essid',
+			'channel':'ch',
+			'rssi':'dbm',
+			'wps_version':'wps',
+			'wps_locked':'lck',
+			'wps_manufacturer':'manuf',
+			'wps_model_name':'model',
+			'wps_model_number':'model#',
+			'wps_device_name':'device',
+			'wps_serial':'serial',
+		},
 		interval: null,
 	},
 	methods: {
