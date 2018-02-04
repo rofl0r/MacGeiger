@@ -116,6 +116,10 @@ class Client
 		@running
 	end
 
+	def jointhr
+		@th.join
+	end
+
 	def run(socket)
 		@running = true
 		@socket = socket
@@ -153,7 +157,7 @@ clients = []
 while session = server.accept
 	clients.each do |client|
 		if not client.running? then
-			client.th.join
+			client.jointhr
 		end
 	end
 	client = Client.new
