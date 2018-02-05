@@ -33,6 +33,18 @@ def wifi_gather
 	socket.close
 end
 
+def select_mac(mac)
+	socket = TCPSocket.new 'localhost', $macgeigerport
+	socket.puts "SELECT " + mac
+	socket.close
+end
+
+def unselect_mac()
+	socket = TCPSocket.new 'localhost', $macgeigerport
+	socket.puts "UNSELECT"
+	socket.close
+end
+
 def http_resp(skt, status, io, content_type)
 	io.rewind
 	skt.print "HTTP/1.1 #{status}\r\nContent-Type: #{content_type}\r\n" +
@@ -58,6 +70,7 @@ end
 
 
 def serve_static(socket, url)
+	url = '/index.html' if url == '/'
 	ct = content_type(url)
 	path = $docroot + url
 	if !(File.exist?(path) && !File.directory?(path)) || url.include?("..")
@@ -87,6 +100,11 @@ def serve_full(skt)
 	end
 	io.print "]}\n"
 	http_resp(skt, "200 OK", io, "application/json")
+end
+
+def serve_empty(skt)
+	io = StringIO.new
+	http_resp(skt, "200 OK", io, "text/html")
 end
 
 def serve_update(skt)
@@ -130,6 +148,13 @@ class Client
 			end
 			url = get_path(line)
 			if url == nil then
+			elsif url == "/api/unselect" then
+				unselect_mac()
+				serve_empty(@socket)
+			elsif url.start_with?("/api/select/") then
+				mac = url.split("/").last
+				select_mac (mac)
+				serve_empty(@socket)
 			elsif url.start_with?("/api/") then
 				case url
 				when "/api/full"

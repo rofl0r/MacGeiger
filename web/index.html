@@ -19,7 +19,7 @@
         <td v-for="key in columns">
           <template v-if="key === 'bssid'">
             <!-- https://vuejs.org/v2/guide/syntax.html#Arguments -->
-            <a v-bind:href="'/api/select/' + entry[key]">
+            <a href="#" v-on:click="select_click(entry[key])">
               {{ entry[key] }}
             </a>
           </template>
@@ -35,17 +35,49 @@
   </table>
 </script>
 
+<script type="text/x-template" id="apanel-template">
+	<div>
+		<template v-if="active === true">
+			<p><a href="#" v-on:click="unselect()">back</a></p>
+			<div><p>ATTACK!</p></div>
+		</template>
+	</div>
+</script>
+
+<script type="text/x-template" id="searchbox-template">
+	<div>
+		<template v-if="hidden === false">
+			<form id="search">
+				Search
+				<input name="query"
+					v-bind:value="query"
+					v-on:input="update_parent($event.target.value)"
+				>
+			</form>
+		</template>
+	</div>
+</script>
+
+
 <!-- demo root element -->
 <div id="demo">
-  <form id="search">
-    Search <input name="query" v-model="searchQuery">
-  </form>
-  <demo-grid
-    :data="gridData"
-    :columns="gridColumns"
-    :headernames="gridHeaders"
-    :filter-key="searchQuery">
-  </demo-grid>
+	<search-box
+		@input="update_query"
+		:hidden="selected"
+		:query="searchQuery" >
+	</search-box>
+	<demo-grid
+		@select_bssid="select"
+		:data="gridData"
+		:columns="gridColumns"
+		:headernames="gridHeaders"
+		:filter-key="searchQuery">
+	</demo-grid>
+	<attack-panel
+		@unselect_send_parent="app_unselect"
+		:active="selected"
+		:bssid="searchQuery" >
+	</attack-panel>
 </div>
 
 <script src="vue"></script>

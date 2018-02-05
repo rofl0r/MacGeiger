@@ -1,3 +1,31 @@
+Vue.component('search-box', {
+	template: '#searchbox-template',
+	props: {
+		hidden: Boolean,
+		query: String,
+	},
+	methods: {
+		update_parent : function(query) {
+			this.$emit('input', query);
+		}
+	}
+})
+
+Vue.component('attack-panel', {
+	template: '#apanel-template',
+	props: {
+		active: Boolean,
+		bssid: String,
+		essid: String,
+		channel: Number
+	},
+	methods : {
+		unselect: function() {
+			this.$emit('unselect_send_parent');
+		}
+	}
+})
+
 // register the grid component
 Vue.component('demo-grid', {
   template: '#grid-template',
@@ -53,7 +81,11 @@ Vue.component('demo-grid', {
     sortBy: function (key) {
       this.sortKey = key
       this.sortOrders[key] = this.sortOrders[key] * -1
-    }
+    },
+	select_click: function(bssid) {
+		this.$emit('select_bssid', bssid);
+	}
+
   }
 })
 
@@ -62,6 +94,8 @@ var demo = new Vue({
 	el: '#demo',
 	data: {
 		searchQuery: '',
+		oldQuery: '',
+		selected: false,
 		gridColumns: [
 			'bssid',
 			'essid',
@@ -129,6 +163,20 @@ var demo = new Vue({
 				this.loadDataAll2();
 			}.bind(this), secs*1000);
 		},
+		update_query : function(query) {
+			this.searchQuery = query;
+		},
+		select: function (bssid) {
+			this.oldQuery = this.searchQuery;
+			this.searchQuery = bssid;
+			this.selected = true;
+			fetch("/api/select/" + bssid)
+		},
+		app_unselect: function () {
+			this.searchQuery = this.oldQuery;
+			this.selected = false;
+			fetch("/api/unselect")
+		}
 	},
 	mounted: function () {
 		this.$nextTick(function () {
