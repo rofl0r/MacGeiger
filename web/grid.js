@@ -41,6 +41,10 @@ Vue.component('demo-grid', {
     }
   },
   filters: {
+    wps_version: function(x) {
+      if(!x) return "";
+      return (x >> 4).toString() + "." + (x & 0xf).toString();
+    },
     capitalize: function (str) {
       return str.charAt(0).toUpperCase() + str.slice(1)
     }

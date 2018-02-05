@@ -17,7 +17,18 @@
     <tbody>
       <tr v-for="entry in filteredData">
         <td v-for="key in columns">
-          {{entry[key]}}
+          <template v-if="key === 'bssid'">
+            <!-- https://vuejs.org/v2/guide/syntax.html#Arguments -->
+            <a v-bind:href="'/api/select/' + entry[key]">
+              {{ entry[key] }}
+            </a>
+          </template>
+          <template v-else-if="key === 'wps_version'">
+            {{ entry[key] | wps_version }}
+          </template>
+          <template v-else>
+            {{ entry[key] }}
+          </template>
         </td>
       </tr>
     </tbody>
