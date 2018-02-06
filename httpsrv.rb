@@ -8,11 +8,17 @@ $port = 8080
 $macgeigerport = 9876
 
 $wifis = Hash.new
+$gt_socket = nil
 def wifi_gather
 	socket = TCPSocket.new 'localhost', $macgeigerport
+	$gt_socket = socket
 	out = false
 	loop do
-		socket.puts "LIST\n"
+		begin
+			socket.puts "LIST\n"
+		rescue IOError
+			break
+		end
 		loop do
 			line = socket.gets
 			if line == nil then
@@ -25,9 +31,7 @@ def wifi_gather
 			#if wifis.key?(wifi_hash["bssid"])
 			$wifis[wifi_hash["bssid"]] = line.chomp
 		end
-		if out then
-			break
-		end
+		break if out
 		sleep 1
 	end
 	socket.close
@@ -138,11 +142,19 @@ class Client
 		@th.join
 	end
 
+	def interrupt
+		@socket.close
+	end
+
 	def run(socket)
 		@running = true
 		@socket = socket
 		loop do
-			line = socket.gets
+			begin
+				line = socket.gets
+			rescue IOError
+				break
+			end
 			if line == nil then
 				break
 			end
@@ -173,21 +185,34 @@ class Client
 	end
 end
 
+def collect_clients
+	$clients.each do |client|
+		if not client.running? then
+			client.jointhr
+		end
+	end
+end
 
 gt = Thread.new { wifi_gather }
 
 server = TCPServer.new $port
 
-clients = []
-while session = server.accept
-	clients.each do |client|
-		if not client.running? then
-			client.jointhr
-		end
+$clients = []
+
+begin
+	while session = server.accept
+		collect_clients
+		client = Client.new
+		client.assign_thread ( Thread.new {client.run(session)} )
+		$clients << client
 	end
-	client = Client.new
-	client.assign_thread ( Thread.new {client.run(session)} )
-	clients << client
+rescue Interrupt
 end
 
+$clients.each do |client|
+	client.interrupt if client.running?
+end
+collect_clients
+$gt_socket.close
 gt.join
+
