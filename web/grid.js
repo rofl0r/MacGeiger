@@ -97,10 +97,12 @@ var demo = new Vue({
 		oldQuery: '',
 		selected: false,
 		gridColumns: [
+			'enc',
 			'bssid',
 			'essid',
 			'channel',
 			'rssi',
+			'uptime',
 			'wps_version',
 			//'wps_state',
 			'wps_locked',
@@ -118,7 +120,10 @@ var demo = new Vue({
 		],
 		gridData: [
 			{
-				'bssid': 0, 'essid': '', 'channel':0, 'rssi':0, 'wps_version':0,
+				'enc' : '',
+				'bssid': 0, 'essid': '', 'channel':0, 'rssi':0,
+				'uptime':'',
+				'wps_version':0,
 				'wps_locked':0, 'wps_state':0,
 				'wps_manufacturer':'', 'wps_model_name':'', 'wps_model_number':'',
 				'wps_device_name':'', 'wps_serial':'', 'wps_uuid':'',
@@ -127,10 +132,12 @@ var demo = new Vue({
 			}
 		],
 		gridHeaders: {
+			'enc' : 'enc',
 			'bssid':'bssid',
 			'essid':'essid',
 			'channel':'ch',
 			'rssi':'dbm',
+			'uptime':'uptime',
 			'wps_version':'wps',
 			'wps_locked':'lck',
 			'wps_manufacturer':'manuf',

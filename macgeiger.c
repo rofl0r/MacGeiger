@@ -110,6 +110,7 @@ enum enctype {
 	ET_WEP,
 	ET_WPA,
 	ET_WPA2,
+	ET_MAX = ET_WPA2
 };
 
 static struct wlaninfo {
@@ -692,7 +693,7 @@ char *mac2str(unsigned char mac[static 6], char buf[static 18]) {
 	return buf;
 }
 
-static void format_timestamp(uint64_t timestamp, char *ts) {
+static char* format_timestamp(uint64_t timestamp, char *ts) {
 #define TSTP_SEC 1000000ULL /* 1 MHz clock -> 1 million ticks/sec */
 #define TSTP_MIN (TSTP_SEC * 60ULL)
 #define TSTP_HOUR (TSTP_MIN * 60ULL)
@@ -707,16 +708,18 @@ static void format_timestamp(uint64_t timestamp, char *ts) {
 	rem %= TSTP_MIN;
 	secs = rem / TSTP_SEC;
 	sprintf(ts, "%ud %02u:%02u:%02u", days, hours, mins, secs);
+	return ts;
 }
 
 static const char* enctype_str(enum enctype et) {
-	switch(et) {
-		case ET_OPEN: return "OPEN";
-		case ET_WEP : return "WEP ";
-		case ET_WPA : return "WPA ";
-		case ET_WPA2: return "WPA2";
-		default: abort();
-	}
+	static const char enc_name[][5] = {
+		[ET_OPEN]= "OPEN",
+		[ET_WEP] = "WEP",
+		[ET_WPA] = "WPA",
+		[ET_WPA2]= "WPA2",
+	};
+	if(et > ET_MAX) abort();
+	return enc_name[et];
 }
 
 static char* sanitize_string(char *s, char *new) {
@@ -790,7 +793,7 @@ static void dump_wlan_info(unsigned wlanidx) {
 	line++;
 	x = col1;
 	console_goto(t, ++x, line);
-	console_printf(t, "%s", enctype_str(w->enctype));
+	console_printf(t, "%4s", enctype_str(w->enctype));
 
 	x = col2;
 	console_goto(t, ++x, line);

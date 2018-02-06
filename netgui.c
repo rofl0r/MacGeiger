@@ -12,10 +12,10 @@ struct thread {
 	volatile int done;
 };
 
-static void dump_json_str(int fd, char *key, char *val) {
+static void dump_json_str(int fd, const char *key, const char *val) {
 	dprintf(fd, "\"%s\" : \"%s\", ", key, val);
 }
-static void dump_json_int(int fd, char *key, int val) {
+static void dump_json_int(int fd, const char *key, int val) {
 	dprintf(fd, "\"%s\" : %d, ", key, val);
 }
 
@@ -29,6 +29,8 @@ static void dump_wlan_json(int fd, size_t wlanid) {
 	dump_json_str(fd, "essid", sanitize_string(w->essid, buf));
 	dump_json_int(fd, "channel", w->channel);
 	dump_json_int(fd, "rssi", w->last_rssi);
+	dump_json_str(fd, "enc", enctype_str(w->enctype));
+	dump_json_str(fd, "uptime", format_timestamp(w->timestamp, buf));
 
 	if(!w->wps) goto wps_done;
 
