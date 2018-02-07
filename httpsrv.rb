@@ -10,8 +10,14 @@ $macgeigerport = 9876
 $wifis = Hash.new
 $gt_socket = nil
 def wifi_gather
-	socket = TCPSocket.new 'localhost', $macgeigerport
-	$gt_socket = socket
+	begin
+		socket = TCPSocket.new 'localhost', $macgeigerport
+		$gt_socket = socket
+	rescue Errno::EADDRNOTAVAIL => e
+		puts e.message
+		puts "maybe you need to start macgeiger first?"
+		exit(1)
+	end
 	out = false
 	loop do
 		begin
