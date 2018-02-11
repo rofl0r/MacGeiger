@@ -878,7 +878,8 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	} else
 		console_printf(t, "<hidden> %*s", ESSID_PRINT_LEN-9, mac2str(w->mac, macbuf));
 
-	console_goto(t, ESSID_PRINT_END +1, line);
+	console_goto(t, ESSID_PRINT_END, line);
+	console_printchar(t, ' ', 0);
 
 	int scale = max - min;
 	int width = dim.w - (ESSID_PRINT_LEN+2);
