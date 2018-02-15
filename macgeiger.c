@@ -207,6 +207,10 @@ void sigh(int x) {
 
 #include "radiotap_flags.h"
 
+static unsigned get_flags_off(unsigned flags, unsigned start_off) {
+	return rt_get_flag_offset(flags, IEEE80211_RADIOTAP_FLAGS, start_off);
+}
+
 static unsigned get_dbm_off(unsigned flags, unsigned start_off) {
 	return rt_get_flag_offset(flags, IEEE80211_RADIOTAP_DBM_ANTSIGNAL, start_off);
 }
@@ -515,13 +519,24 @@ static int process_frame(pcap_t *foo) {
 	if(data) {
 		if(console_getbackendtype(t) == cb_sdl && getenv("DEBUG")) dump_packet(data, h.len);
 
-		uint32_t flags, offset;
+		uint32_t flags, offset, fchksum;
+
 		if(!rt_get_presentflags(data, h.len, &flags, &offset))
 			return -1;
 
 		struct ieee80211_radiotap_header *rh = (void*) data;
 
 		unsigned rtap_data = offset;
+
+		if(flags & (1U << IEEE80211_RADIOTAP_FLAGS)) {
+			unsigned flags_off = get_flags_off(flags, rtap_data);
+			if(data[flags_off] & 0x10 /* IEEE80211_RADIOTAP_F_FCS */) {
+				/* TODO handle bad FCS IEEE80211_RADIOTAP_F_BADFCS  0x40 */
+				memcpy(&fchksum, data + h.len - 4, 4);
+				fchksum = end_le32toh(fchksum);
+				h.len -= 4;
+			}
+		}
 
 		struct wlaninfo temp = {0};
 		{
