@@ -46,7 +46,8 @@ paste this into your shell
 
     mkdir /tmp/macgeiger-build
     cd /tmp/macgeiger-build
-    for i in rcb concol macgeiger ; do git clone git://github.com/rofl0r/$i ; done
+    for i in rcb concol macgeiger libulz ; do git clone git://github.com/rofl0r/$i ; done
+    mv libulz lib
     ln -s rcb.pl rcb/rcb
     cd macgeiger/
     printf "%s\n%s\n" "CFLAGS+=-DCONSOLE_BACKEND=SDL_CONSOLE" "CFLAGS+=-DCONSOLE_FONT=INT10FONT14" > config.mak
