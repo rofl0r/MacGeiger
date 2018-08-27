@@ -33,6 +33,8 @@
 //RcB: DEP "audio-backend.c"
 #include "audio-backend.c"
 
+#include "pcapfile.h"
+
 #define LIBRARY_CODE
 #include "channel-switch.c"
 
@@ -265,19 +267,7 @@ static const unsigned char* pcap_next_wrapper(pcap_t *foo, struct pcap_pkthdr *h
 			*h_out = *hdr_temp;
 		} else ret = 0;
 		if(ret && outfd != -1){
-			struct pcap_file_pkthdr {
-				unsigned sec_epoch;
-				unsigned ms_sec;
-				unsigned caplen;
-				unsigned len;
-			} hdr_out = {
-				.sec_epoch = h_out->ts.tv_sec,
-				.ms_sec = h_out->ts.tv_usec,
-				.caplen = h_out->caplen,
-				.len = h_out->len,
-			};
-			write(outfd, &hdr_out, sizeof hdr_out);
-			write(outfd, ret, h_out->len);
+			pcapfile_write_packet(outfd, h_out, ret);
 		}
 		return ret;
 	}
@@ -1149,9 +1139,7 @@ int main(int argc,char**argv) {
 		foo = pcap_create(argv[1], errbuf);
 		outfd= open("tmp.pcap", O_WRONLY|O_CREAT|O_TRUNC,0660);
 		if(outfd != -1)
-			write(outfd, "\xD4\xC3\xB2\xA1" "\x02\x00\x04\x00"
-			             "\x00\x00\x00\x00" "\x00\x00\x00\x00"
-			             "\x00\x00\x04\x00" "\x7F\x00\x00\x00", 24);
+			pcapfile_write_header(outfd);
 	}
 	if(!foo) { dprintf(2, "%s\n", errbuf); return 1; }
 
