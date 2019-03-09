@@ -922,16 +922,19 @@ static void dump_wlan(unsigned idx) {
 }
 #endif
 
+int this_wlan_scale_mode = 1;
 static void calc_bms(unsigned wlanidx) {
 	long long now = getutime64();
 	struct wlaninfo *w = &wlans[wlanidx];
 	lock();
+	int my_min = this_wlan_scale_mode ? w->min_rssi : min;
+	int my_max = this_wlan_scale_mode ? w->max_rssi : max;
 	long long age_ms = (now - w->last_seen)/1000;
 	unlock();
 	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
-	int scale = max - min;
+	int scale = my_max - my_min;
 	float scalepercent = (float)scale/100.f;
-	float curr_percent = ((float)w->last_rssi - (float)min) / scalepercent;
+	float curr_percent = ((float)w->last_rssi - (float)my_min) / scalepercent;
 	if(age_ms < 15) set_bms(curr_percent);
 	else bms = 0;
 }
@@ -1192,6 +1195,7 @@ int main(int argc,char**argv) {
 		int k = console_getkey_nb(t);
 
 		switch(k) {
+			case CK_CURSOR_RIGHT: this_wlan_scale_mode = !this_wlan_scale_mode; break;
 			case '+': case '0': volume_change(+1); break;
 			case '-': case '9': volume_change(-1); break;
 			case CK_CURSOR_DOWN: selection_move(1);break;
