@@ -30,7 +30,6 @@
 
 #define GUI_FPS 40
 
-//RcB: DEP "audio-backend.c"
 #include "audio-backend.c"
 
 #include "pcapfile.h"
@@ -46,8 +45,7 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-//RcB: LINK "-lpcap"
-//RcB: LINK "-lpthread"
+#pragma RcB2 LINK "-lpcap" "-lpthread"
 
 #include "../concol/console.h"
 #include "../concol/console_keys.h"
@@ -1122,9 +1120,6 @@ static void set_selection(int on) {
 }
 
 
-//RcB: DEP "server.c"
-//RcB: DEP "../lib/src/sblist/*.c"
-//RcB: DEP "../lib/src/strlib/hexval.c"
 #include "netgui.c"
 
 int main(int argc,char**argv) {

@@ -23,8 +23,8 @@ Dependencies
 - libao   :audio output library
 
 1st party dependencies
-- rcb     :build tool
-  - depends on perl
+- rcb2     :build tool
+  - depends on python2
 - concol  :terminal library with ncurses,termbox and SDL backends
   - depends on either SDL or ncurses devel package installed
 
@@ -46,12 +46,12 @@ paste this into your shell
 
     mkdir /tmp/macgeiger-build
     cd /tmp/macgeiger-build
-    for i in rcb concol macgeiger libulz ; do git clone git://github.com/rofl0r/$i ; done
+    for i in rcb2 concol macgeiger libulz ; do git clone git://github.com/rofl0r/$i ; done
     mv libulz lib
-    ln -s rcb.pl rcb/rcb
+    ln -s rcb2.py rcb2/rcb2
     cd macgeiger/
     printf "%s\n%s\n" "CFLAGS+=-DCONSOLE_BACKEND=SDL_CONSOLE" "CFLAGS+=-DCONSOLE_FONT=INT10FONT14" > config.mak
-    PATH="$PATH:../rcb" make
+    PATH="$PATH:../rcb2" make
 
 if you want to use the ncurses backend (which is much harder to debug using gdb),
 replace SDL_CONSOLE with NCURSES_CONSOLE in the above printf command
@@ -63,7 +63,7 @@ rebuilding with a different console backend:
 -------------------------------------------
 if you decided to try another backend (not the previously used one), run
 
-    PATH="$PATH:../rcb" RCBFLAGS=--new make
+    PATH="$PATH:../rcb2" RCBFLAGS=--new make
 
 how to use:
 -----------

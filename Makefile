@@ -11,17 +11,15 @@ CFLAGS_RCB_DBG=${CFLAGS_OWN} ${CFLAGS_DBG} ${CFLAGS}
 
 SRCS=$(FNAME).c audio-backend.c channel-switch.c netgui.c
 
-all: $(FNAME).out
+all: $(FNAME)
 
-$(FNAME).rcb: config.mak
-	CFLAGS="${CFLAGS_RCB_DBG}" rcb --force --new $(RCBFLAGS) $(FNAME).c
-
-$(FNAME).out: $(SRCS) $(FNAME).rcb
-	CFLAGS="${CFLAGS_RCB_DBG}" rcb --force $(RCBFLAGS) $(FNAME).c
+$(FNAME): $(SRCS)
+	CFLAGS="${CFLAGS_RCB_DBG} ${CFLAGS}" rcb2 $(RCBFLAGS) $(FNAME).c
 
 clean:
 	rm -f *.o
 	rm -f $(FNAME).out
+	rm -f $(FNAME)
 	rm -f *.rcb
 
 .PHONY: all clean optimized debug
