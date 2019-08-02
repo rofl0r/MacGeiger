@@ -58,7 +58,7 @@
 static int outfd;
 
 static int usage(const char *argv0) {
-	dprintf(2, "%s network-interface\n"
+	dprintf(2, "%s [-c channel] network-interface\n"
 		   "i.e.: %s wlan0\n", argv0, argv0
 		);
 	return 1;
@@ -1021,6 +1021,10 @@ static void* blip_thread(void* arg) {
 	return 0;
 }
 
+static void* nop_thread(void *arg) {
+	return 0;
+}
+
 static void* chanwalker_thread(void* arg) {
 	char* itf = arg;
 	int channel = 1, delay = 800;
@@ -1123,18 +1127,25 @@ static void set_selection(int on) {
 #include "netgui.c"
 
 int main(int argc,char**argv) {
-	if(argc == 1) return usage(argv[0]);
-	itf = argv[1];
+	int c;
+	int fixed_chan = 0;
+	while((c = getopt(argc, argv, "c:")) != EOF) switch(c) {
+		case 'c': fixed_chan = atoi(optarg); break;
+		default: return usage(argv[0]);
+	}
+	if(!argv[optind]) return usage(argv[0]);
+
+	itf = argv[optind];
 	min = 127;
 	max = -60;
 	outfd = -1;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *foo;
-	if(strchr(argv[1], '.') && access(argv[1], R_OK) == 0) {
+	if(strchr(itf, '.') && access(itf, R_OK) == 0) {
 		filebased = 1;
-		foo = pcap_open_offline(argv[1], errbuf);
+		foo = pcap_open_offline(itf, errbuf);
 	} else {
-		foo = pcap_create(argv[1], errbuf);
+		foo = pcap_create(itf, errbuf);
 		outfd= open("tmp.pcap", O_WRONLY|O_CREAT|O_TRUNC,0660);
 		if(outfd != -1)
 			pcapfile_write_header(outfd);
@@ -1145,17 +1156,17 @@ int main(int argc,char**argv) {
 
 	if(filebased) goto skip;
 
-	if((orgmode = getiwmode(argv[1])) != IW_MODE_MONITOR) {
-		if((ret = ifdownup(argv[1], 0, 0)) == -1) {
+	if((orgmode = getiwmode(itf)) != IW_MODE_MONITOR) {
+		if((ret = ifdownup(itf, 0, 0)) == -1) {
 			iferr:;
 			perror("error setting up interface - maybe need to run as root.");
 		}
 		wasdown = (ret == 2);
-		if(setiwmode(argv[1], IW_MODE_MONITOR) == -1) goto iferr;
+		if(setiwmode(itf, IW_MODE_MONITOR) == -1) goto iferr;
 	} else {
-		wasdown = (ifdownup(argv[1], 0, 1) == 2);
+		wasdown = (ifdownup(itf, 0, 1) == 2);
 	}
-	if(ifdownup(argv[1], 1, 0) == -1) goto iferr;
+	if(ifdownup(itf, 1, 0) == -1) goto iferr;
 
 	if(pcap_activate(foo)) {
 		dprintf(2, "pcap_activate failed: %s\n", pcap_geterr(foo));
@@ -1168,10 +1179,14 @@ int main(int argc,char**argv) {
 
 	signal(SIGINT, sigh);
 
-	int channel = 1;
+	int channel = fixed_chan ? fixed_chan : 1;
+	if(fixed_chan) set_channel(itf, fixed_chan);
 	long long tm = 0;
 	pthread_t ct, nt;
-	pthread_create(&wt, 0, chanwalker_thread, argv[1]);
+	void *(*cw_func)(void*);
+	if(filebased || fixed_chan) cw_func = nop_thread;
+	else cw_func = chanwalker_thread;
+	pthread_create(&wt, 0, cw_func, (void*) itf);
 	pthread_create(&ct, 0, capture_thread, foo);
 
 	struct netgui_config netgui_cfg;
@@ -1226,9 +1241,9 @@ int main(int argc,char**argv) {
 	// bring down the interface - so this must happen before we join the thread
 	// and close the pcap handle.
 	if(!filebased) {
-		if(wasdown || orgmode != IW_MODE_MONITOR) ifdownup(argv[1], 0, 0);
-		if(orgmode != IW_MODE_MONITOR) setiwmode(argv[1], orgmode);
-		if(!wasdown && orgmode != IW_MODE_MONITOR) ifdownup(argv[1], 1, 0);
+		if(wasdown || orgmode != IW_MODE_MONITOR) ifdownup(itf, 0, 0);
+		if(orgmode != IW_MODE_MONITOR) setiwmode(itf, orgmode);
+		if(!wasdown && orgmode != IW_MODE_MONITOR) ifdownup(itf, 1, 0);
 	}
 
 	pthread_join(ct, 0);
