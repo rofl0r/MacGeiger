@@ -639,15 +639,6 @@ static void draw_bg() {
 	}
 }
 
-#if 0
-static void dump_wlan(unsigned idx) {
-	struct wlaninfo *w = &wlans[idx];
-	dprintf(1, "%.2d %-24s %02x:%02x:%02x:%02x:%02x:%02x %.2f - %d\n", w->channel, w->essid,
-	            w->mac[0], w->mac[1],
-	            w->mac[2], w->mac[3], w->mac[4], w->mac[5],
-	            (double)w->total_rssi/(double)w->count, w->last_rssi);
-}
-#else
 static unsigned reduce_color(unsigned val) {
 	unsigned a = val;
 	if (colorcount <= 8) {
@@ -918,7 +909,6 @@ static void dump_wlan(unsigned idx) {
 	dump_wlan_at(idx, selected ? 1 : idx * LINES_PER_NET);
 	if(selected) dump_wlan_info(idx);
 }
-#endif
 
 int this_wlan_scale_mode = 1;
 static void calc_bms(unsigned wlanidx) {
