@@ -258,10 +258,16 @@ static int filebased;
 
 static const unsigned char* pcap_next_wrapper(pcap_t *foo, struct pcap_pkthdr *h_out) {
 	if(!filebased) {
+	again:;
 		const unsigned char* ret = 0;
 		struct pcap_pkthdr *hdr_temp;
 		int err = pcap_next_ex(foo, &hdr_temp, &ret);
 		if(err == 1) {
+			/* skip malformed packets, like those emitted by busybox udhcpc */
+			struct ieee80211_radiotap_header *rh = (void*) ret;
+			if(rh->it_version != 0 || end_le16toh(rh->it_len) > hdr_temp->len)
+				goto again;
+
 			*h_out = *hdr_temp;
 		} else ret = 0;
 		if(ret && outfd != -1){
