@@ -546,7 +546,7 @@ static int process_frame(pcap_t *foo) {
 			temp.channel = channel_from_freq(freq);
 		}
 		uint16_t framectl;
-		offset = rh->it_len;
+		offset = end_le16toh(rh->it_len);
 		memcpy(&framectl, data+offset, 2);
 		framectl = end_le16toh(framectl);
 		struct beaconframe* beacon;
