@@ -1142,7 +1142,9 @@ int main(int argc,char**argv) {
 		foo = pcap_open_offline(itf, errbuf);
 	} else {
 		foo = pcap_create(itf, errbuf);
-		outfd= open("tmp.pcap", O_WRONLY|O_CREAT|O_TRUNC,0660);
+		char fnbuf[512];
+		snprintf(fnbuf, sizeof fnbuf, "tmp.%s.pcap", itf);
+		outfd= open(fnbuf, O_WRONLY|O_CREAT|O_TRUNC,0660);
 		if(outfd != -1)
 			pcapfile_write_header(outfd);
 	}
