@@ -113,6 +113,17 @@ enum enctype {
 	ET_MAX = ET_WPA2
 };
 
+struct ap_client {
+	long long total_rssi;
+	long long last_seen;
+	unsigned long count;
+	signed char last_rssi;
+	signed char min_rssi;
+	signed char max_rssi;
+	unsigned char mac[6];
+	struct ap_client *next;
+};
+
 struct wlaninfo {
 	struct wps_data *wps;
 	long long total_rssi;
@@ -127,6 +138,7 @@ struct wlaninfo {
 	signed char min_rssi;
 	signed char max_rssi;
 	char enctype;
+	struct ap_client *clients;
 };
 
 #define STATIC_ALLOC 1
@@ -210,6 +222,37 @@ static int get_new_wlan(void) {
 	return res;
 }
 
+static struct ap_client *get_client(struct wlaninfo *w, unsigned char mac[6]) {
+	struct ap_client *c;
+	for(c = w->clients; c; c = c->next) {
+		if(!memcmp(mac, c->mac, 6)) return c;
+	}
+	return 0;
+}
+
+static struct ap_client *add_client(struct wlaninfo *w, unsigned char mac[6]) {
+	struct ap_client *c = calloc(1, sizeof(*c)), *it;
+	memcpy(c->mac, mac, 6);
+	if(!w->clients) w->clients = c;
+	else {
+		it = w->clients;
+		while(it->next) it=it->next;
+		it->next = c;
+	}
+	return c;
+}
+
+static long long getutime64(void);
+
+static void set_client_rssi(struct wlaninfo* w, struct ap_client *c) {
+	c->count++;
+	c->total_rssi += w->last_rssi;
+	c->last_seen = getutime64();
+	c->last_rssi = w->last_rssi;
+	c->min_rssi = MIN(c->min_rssi, c->last_rssi);
+	c->max_rssi = MAX(c->max_rssi, c->last_rssi);
+}
+
 static int set_rssi(struct wlaninfo *w, struct wps_data* wps) {
 	int i = -1;
 	struct wlaninfo wtmp, *d = &wtmp;
@@ -270,7 +313,7 @@ static unsigned channel_from_freq(unsigned freq) {
 	return freq==2484?14:(freq-2407)/5;
 }
 
-struct beaconframe {
+struct dot11frame {
 	uint16_t framecontrol;
 	uint16_t duration;
 	unsigned char receiver[6];
@@ -592,11 +635,11 @@ static int process_frame(pcap_t *foo) {
 			memcpy(&freq, data+ chanoff, 2);
 			temp.channel = channel_from_freq(freq);
 		}
-		uint16_t framectl;
+		uint16_t framectl, fctype;
 		offset = end_le16toh(rh->it_len);
 		memcpy(&framectl, data+offset, 2);
 		framectl = end_le16toh(framectl);
-		struct beaconframe* beacon;
+		struct dot11frame* beacon;
 		unsigned const char* tagdata;
 		unsigned pos;
 		uint16_t caps;
@@ -609,7 +652,7 @@ static int process_frame(pcap_t *foo) {
 			case 0x0050: /* probe response */
 				beacon = (void*)(data+offset);
 				memcpy(&temp.mac,beacon->source,6);
-				offset += sizeof(struct beaconframe);
+				offset += sizeof(*beacon);
 				memcpy(&temp.timestamp,data+offset,8);
 				temp.timestamp = end_le64toh(temp.timestamp);
 				offset += 8;
@@ -631,10 +674,47 @@ static int process_frame(pcap_t *foo) {
 
 				break;
 			case 0x00d4: /*ack*/
-			case 0x4288: /*QOS */
 			case 0x0040: /* probe request */
-			default:
 				return -1;
+			default:
+			fctype = framectl & end_htole16(IEEE80211_FCTL_FTYPE | IEEE80211_FCTL_STYPE);
+			if(fctype == end_htole16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA) ||
+			   fctype == end_htole16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_QOS_DATA) ||
+			   fctype == end_htole16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_NULLFUNC) ||
+			   fctype == end_htole16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_QOS_NULLFUNC)
+			) {
+				beacon = (void*)(data+offset);
+				if(!memcmp(beacon->receiver, "\x01\x80\xc2", 3) ||
+				   !memcmp(beacon->receiver, "\x01\x00\x0c\xcc\xcc\xcc", 6) ||
+				   !memcmp(beacon->receiver, "\xff\xff\xff", 3))
+					return -1;
+
+				int wifi_nr = get_wlan_by_mac(beacon->bssid);
+				/* ignore packets sent to unknown APs */
+				if(wifi_nr == -1) return -1;
+				unsigned char *client_mac;
+				if(memcmp(beacon->source, beacon->bssid, 6))
+					/* client to AP */
+					client_mac = beacon->source;
+				else
+					/* AP to client */
+					client_mac = beacon->receiver;
+
+				struct wlaninfo apbuf, *ap=&apbuf;
+				get_wlan(wifi_nr, ap);
+				struct ap_client* c = get_client(ap, client_mac);
+				if(!c) c = add_client(ap, client_mac);
+				write_wlan(wifi_nr, ap);
+				setminmax(temp.last_rssi);
+				if(client_mac == beacon->source) {
+					set_client_rssi(&temp, c);
+					return -1;
+				} else return wifi_nr;
+
+				}
+			else {
+				return -1;
+			}
 		}
 		//while(htonl(*(flags++)) & (1U << IEEE80211_RADIOTAP_EXT)) next_chunk+=4;
 		//dprintf(2, "got data\n");
@@ -890,6 +970,15 @@ static void dump_wlan_info(unsigned wlanidx) {
 	if(w->wps && w->wps->serial[0]) {
 		sanitize_string(w->wps->serial, sanbuf);
 		console_printf(t, "%s", sanbuf);
+	}
+
+	line += 2;
+	struct ap_client *c;
+	for(c = w->clients; c; c = c->next) {
+		x = col1;
+		console_goto(t, ++x, line);
+		console_printf(t, "client %s", mac2str(c->mac, macbuf));
+		line++;
 	}
 }
 
