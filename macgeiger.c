@@ -113,7 +113,7 @@ enum enctype {
 	ET_MAX = ET_WPA2
 };
 
-static struct wlaninfo {
+struct wlaninfo {
 	struct wps_data *wps;
 	long long total_rssi;
 	long long last_seen;
@@ -127,12 +127,37 @@ static struct wlaninfo {
 	signed char min_rssi;
 	signed char max_rssi;
 	char enctype;
-} wlans[128];
+};
+
+#define STATIC_ALLOC 1
+#if STATIC_ALLOC
+static struct wlaninfo wlans_storage[256];
 static unsigned wlan_count;
+#define DYNA_NEW(X) wlans_storage
+#define DYNA_GROW(X) (wlan_count++, wlans)
+#define DYNA_COUNT(X) wlan_count
+#else
+#include "../lib/include/dynarray.h"
+#endif
+
+static struct wlaninfo *wlans;
 
 static pthread_mutex_t wlan_lock = PTHREAD_MUTEX_INITIALIZER;
 #define lock() pthread_mutex_lock(&wlan_lock)
 #define unlock() pthread_mutex_unlock(&wlan_lock)
+
+static inline void get_wlan(size_t index, struct wlaninfo* out) {
+	lock();
+	memcpy(out, &wlans[index], sizeof(*out));
+	unlock();
+}
+
+static inline void write_wlan(size_t index, struct wlaninfo* in) {
+	lock();
+	memcpy(&wlans[index], in, sizeof(*in));
+	unlock();
+}
+
 
 static signed char min, max;
 static unsigned char selection, selected;
@@ -140,36 +165,58 @@ static Console co, *t = &co;
 static int colorcount;
 
 static int get_wlan_by_essid(char* essid) {
-	unsigned i;
-	for(i=0;i<wlan_count;i++)
-		if(!strcmp(essid, wlans[i].essid)) return i;
-	return -1;
+	unsigned i, l;
+	int res = -1;
+	lock();
+	l = DYNA_COUNT(wlans);
+	for(i=0;i<l;i++) {
+		if(!strcmp(essid, wlans[i].essid)) {
+			res = i;
+			break;
+		}
+	}
+	unlock();
+	return res;
 }
 
 static int get_wlan_by_mac(unsigned char mac[6]) {
-	unsigned i;
-	for(i=0;i<wlan_count;i++)
-		if(!memcmp(mac, wlans[i].mac, 6)) return i;
-	return -1;
+	unsigned i, l;
+	int res = -1;
+	lock();
+	l = DYNA_COUNT(wlans);
+	for(i=0;i<l;i++) {
+		if(!memcmp(mac, wlans[i].mac, 6)) {
+			res = i;
+			break;
+		}
+	}
+	unlock();
+	return res;
 }
 
 static int get_new_wlan(void) {
-	if(wlan_count+1<sizeof(wlans)/sizeof(wlans[0])) {
-		wlans[wlan_count].min_rssi = 127;
-		wlans[wlan_count].max_rssi = -127;
-		return wlan_count++;
+	lock();
+	void* p = DYNA_GROW(wlans);
+	if(!p) {
+		unlock();
+		return -1;
 	}
-	return -1;
+	wlans = p;
+	memset(&wlans[DYNA_COUNT(wlans)-1], 0, sizeof(wlans[0]));
+	wlans[DYNA_COUNT(wlans)-1].min_rssi = 127;
+	wlans[DYNA_COUNT(wlans)-1].max_rssi = -127;
+	int res = DYNA_COUNT(wlans)-1;
+	unlock();
+	return res;
 }
 
 static int set_rssi(struct wlaninfo *w, struct wps_data* wps) {
 	int i = -1;
-//	if(w->essid[0]) i = get_wlan_by_essid(w->essid);
-	lock();
+	struct wlaninfo wtmp, *d = &wtmp;
 	if(i == -1) i = get_wlan_by_mac(w->mac);
 	if(i == -1) i = get_new_wlan();
 	if(i != -1) {
-		struct wlaninfo *d = &wlans[i];
+		get_wlan(i, d);
 		if(w->essid[0]) strcpy(d->essid, w->essid);
 		memcpy(d->mac, w->mac, 6);
 		d->total_rssi += w->last_rssi;
@@ -195,8 +242,8 @@ static int set_rssi(struct wlaninfo *w, struct wps_data* wps) {
 					memcpy(d->wps, wps, sizeof(*wps));
 			}
 		}
+		write_wlan(i, d);
 	}
-	unlock();
 	return i;
 }
 
@@ -668,7 +715,10 @@ static int get_a(unsigned age) {
 #define LINES_PER_NET 1
 static void selection_move(int dir) {
 	if((int)selection+dir < 0) dir=0;
-	if((int)selection+dir >= wlan_count ||
+	lock();
+	unsigned l = DYNA_COUNT(wlans);
+	unlock();
+	if((int)selection+dir >= l ||
 	   ((int)selection+dir)*LINES_PER_NET+1 >= dim.h) dir=0;
 	selection += dir;
 }
@@ -740,8 +790,8 @@ static char* sanitize_string(char *s, char *new) {
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
 
 static void dump_wlan_info(unsigned wlanidx) {
-	struct wlaninfo *w = &wlans[wlanidx];
-	lock();
+	struct wlaninfo wtmp, *w = &wtmp;
+	get_wlan(wlanidx, w);
 	unsigned line = 3, x, col1, col2, col3, col4;
 	console_setcolor(t, 0, BGCOL);
 	console_setcolor(t, 1, COL_WHITE);
@@ -841,8 +891,6 @@ static void dump_wlan_info(unsigned wlanidx) {
 		sanitize_string(w->wps->serial, sanbuf);
 		console_printf(t, "%s", sanbuf);
 	}
-
-	unlock();
 }
 
 static void dump_wlan_at(unsigned wlanidx, unsigned line) {
@@ -857,9 +905,8 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 		console_printchar(t, ' ', 0);
 	}
 
-	struct wlaninfo *w = &wlans[wlanidx];
-
-	lock();
+	struct wlaninfo wtmp, *w = &wtmp;
+	get_wlan(wlanidx, w);
 
 	long long now = getutime64();
 	long long age_ms = (now - w->last_seen)/1000;
@@ -893,8 +940,6 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	int avg_marker = (avg - (float)min) * scaleup;
 	int curr_marker = ((float)w->last_rssi - (float)min) * scaleup;
 
-	unlock();
-
 	for(x = 0; x < width; x++) {
 		rgb_t step_color;
 		if(wlanidx == selection) step_color = RGB(get_r(x/widthpercent),get_g(x/widthpercent),0);
@@ -919,12 +964,11 @@ static void dump_wlan(unsigned idx) {
 int this_wlan_scale_mode = 1;
 static void calc_bms(unsigned wlanidx) {
 	long long now = getutime64();
-	struct wlaninfo *w = &wlans[wlanidx];
-	lock();
+	struct wlaninfo wtmp, *w = &wtmp;
+	get_wlan(wlanidx, w);
 	int my_min = this_wlan_scale_mode ? w->min_rssi : min;
 	int my_max = this_wlan_scale_mode ? w->max_rssi : max;
 	long long age_ms = (now - w->last_seen)/1000;
-	unlock();
 	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
 	int scale = my_max - my_min;
 	float scalepercent = (float)scale/100.f;
@@ -934,10 +978,13 @@ static void calc_bms(unsigned wlanidx) {
 }
 
 static void dump(void) {
-	unsigned i;
+	unsigned i, l;
+	lock();
+	l = DYNA_COUNT(wlans);
+	unlock();
 	//dprintf(1, "********************\n");
 	//draw_bg();
-	for(i=0;i<wlan_count;i++)
+	for(i=0;i<l;i++)
 		dump_wlan(i);
 	console_refresh(t);
 }
@@ -1112,7 +1159,12 @@ static void set_selection(int on) {
 		pthread_join(wt, 0);
 		draw_bg();
 		pthread_create(&bt, 0, blip_thread, 0);
-		if(!filebased) set_channel(itf, wlans[selection].channel);
+		if(!filebased) {
+			lock();
+			int ch = wlans[selection].channel;
+			unlock();
+			set_channel(itf, ch);
+		}
 	} else {
 		pthread_create(&wt, 0, chanwalker_thread, (void*)itf);
 		pthread_join(bt, 0);
@@ -1123,6 +1175,7 @@ static void set_selection(int on) {
 #include "netgui.c"
 
 int main(int argc,char**argv) {
+	wlans = DYNA_NEW(struct wlaninfo);
 	int c;
 	int fixed_chan = 0;
 	while((c = getopt(argc, argv, "c:")) != EOF) switch(c) {

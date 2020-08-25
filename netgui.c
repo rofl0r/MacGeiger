@@ -20,7 +20,8 @@ static void dump_json_int(int fd, const char *key, int val) {
 }
 
 static void dump_wlan_json(int fd, size_t wlanid) {
-	struct wlaninfo* w = &wlans[wlanid];
+	struct wlaninfo wtmp, *w = &wtmp;
+	get_wlan(wlanid, w);
 	char buf[256+8];
 	assert(sizeof buf >= WPS_MAX_STR_LEN*4);
 	assert(sizeof buf >= sizeof(wlans[0].essid)*4);
@@ -61,18 +62,22 @@ static void* clientthread(void *data) {
 	struct thread *t = data;
 	char buf[32];
 	ssize_t n;
-	size_t i;
+	size_t i, l;
 	while(!server_done) {
 		n = recv(t->client.fd, buf, sizeof buf, 0);
 		if(n <= 0) break;
 		if(!strcmp(buf, "LIST\n")) {
 			lock();
-			for(i=0; i<wlan_count; i++) {
-				if(wlans[i].last_seen > t->last_update)
+			l = DYNA_COUNT(wlans);
+			unlock();
+			for(i=0; i<l; i++) {
+				lock();
+				long long ls = wlans[i].last_seen;
+				unlock();
+				if(ls > t->last_update)
 					dump_wlan_json(t->client.fd, i);
 			}
 			t->last_update = getutime64();
-			unlock();
 			dprintf(t->client.fd, "END\n");
 		} else if (!strcmp(buf, "QUIT\n")) {
 			server_done = 1;
@@ -91,15 +96,20 @@ static void* clientthread(void *data) {
 				m++;
 				p+=2;
 			}
+			int newsel = -1;
 			lock();
-			for(i=0;i<wlan_count; i++) {
+			l = DYNA_COUNT(wlans);
+			for(i=0;i<l; i++) {
 				if(!memcmp(wlans[i].mac, mac, 6)) {
-					selection = i;
-					set_selection(1);
+					newsel = i;
 					break;
 				}
 			}
 			unlock();
+			if(newsel > -1) {
+				selection = newsel;
+				set_selection(1);
+			}
 		}
 	}
 	return 0;
