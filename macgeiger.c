@@ -233,6 +233,8 @@ static struct ap_client *get_client(struct wlaninfo *w, unsigned char mac[6]) {
 static struct ap_client *add_client(struct wlaninfo *w, unsigned char mac[6]) {
 	struct ap_client *c = calloc(1, sizeof(*c)), *it;
 	memcpy(c->mac, mac, 6);
+	c->min_rssi = 127;
+	c->max_rssi = -127;
 	if(!w->clients) w->clients = c;
 	else {
 		it = w->clients;
@@ -865,6 +867,13 @@ static char* sanitize_string(char *s, char *new) {
 	return new;
 }
 
+static unsigned gray_shade_from_timestamp(long long last_seen) {
+	long long now = getutime64();
+	long long age_ms = (now - last_seen)/1000;
+	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
+	return get_a(age_ms);
+}
+
 #define ESSID_PRINT_START 1
 #define ESSID_PRINT_END 32+ESSID_PRINT_START
 #define ESSID_PRINT_LEN (ESSID_PRINT_END - ESSID_PRINT_START)
@@ -973,11 +982,47 @@ static void dump_wlan_info(unsigned wlanidx) {
 	}
 
 	line += 2;
+	if(w->clients) {
+		x = col1;
+		console_goto(t, ++x, line++);
+		console_printf(t, "CLIENT"
+			"%*s%s" "%*s%s" "%*s%s" "%*s%s",
+			21-6, "", "AVG",
+			15-3, "", "CURR",
+			12-4, "", "MIN",
+			12-3, "", "MAX"
+		);
+	}
 	struct ap_client *c;
 	for(c = w->clients; c; c = c->next) {
+
+		unsigned a = gray_shade_from_timestamp(c->last_seen);
+		console_setcolor(t, 1, RGB(a,a,a));
+
 		x = col1;
 		console_goto(t, ++x, line);
-		console_printf(t, "client %s", mac2str(c->mac, macbuf));
+		console_printf(t, "%s", mac2str(c->mac, macbuf));
+
+		x += 20;
+
+		console_setcolor(t, 1, COL_WHITE);
+
+		console_goto(t, ++x, line);
+		console_printf(t, "%.2f dBm", (double)c->total_rssi/(double)c->count);
+		x += 14;
+
+		console_goto(t, ++x, line);
+		console_printf(t, "%d dBm", c->last_rssi);
+		x += 11;
+
+		console_goto(t, ++x, line);
+		console_printf(t, "%d dBm", c->min_rssi);
+		x += 11;
+
+		console_goto(t, ++x, line);
+		console_printf(t, "%d dBm", c->max_rssi);
+		x += 9 + 5;
+
 		line++;
 	}
 }
@@ -997,11 +1042,7 @@ static void dump_wlan_at(unsigned wlanidx, unsigned line) {
 	struct wlaninfo wtmp, *w = &wtmp;
 	get_wlan(wlanidx, w);
 
-	long long now = getutime64();
-	long long age_ms = (now - w->last_seen)/1000;
-	age_ms=MIN(5000, age_ms)/100; /* seems we end up with a range 0-50 */
-	unsigned a = get_a(age_ms);
-
+	unsigned a = gray_shade_from_timestamp(w->last_seen);
 	console_setcolor(t, 1, RGB(a,a,a));
 	console_goto(t, ESSID_PRINT_START, line);
 
