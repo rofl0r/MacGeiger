@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <net/if.h>
-#include <stropts.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include "wireless-lite.h"
 
